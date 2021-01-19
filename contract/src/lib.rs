@@ -12,7 +12,7 @@
  */
 
 // To conserve gas, efficient serialization is achieved through Borsh (http://borsh.io/)
-use near_lib::types::{Duration, WrappedBalance, WrappedDuration};
+use near_lib::types::{WrappedBalance, WrappedDuration};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedMap;
 use near_sdk::serde::{Deserialize, Serialize};
@@ -28,6 +28,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 //const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000_000_000;
 const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000;
 const MAX_DESCRIPTION_LENGTH: usize = 280;
+const MAX_DRAW: usize = 32;
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
@@ -38,9 +39,10 @@ pub struct Event {
 
     participants: Vec<AccountId>,
     allow_duplicate_participants: bool,
-    add_participants_start_date: WrappedDuration,
-    add_participants_end_date: WrappedDuration,
-    event_date: WrappedDuration,
+    add_participants_start_block: WrappedDuration,
+    add_participants_end_block: WrappedDuration,
+    event_block: WrappedDuration,
+    finalized_block: WrappedDuration,
 
     title: String,
     description: String,
@@ -55,9 +57,9 @@ pub struct EventInput {
     participants: Vec<AccountId>,
     allow_duplicate_participants: bool,
 
-    add_participants_start_date: WrappedDuration,
-    add_participants_end_date: WrappedDuration,
-    event_date: WrappedDuration,
+    add_participants_start_block: WrappedDuration,
+    add_participants_end_block: WrappedDuration,
+    event_block: WrappedDuration,
 
     title: String,
     description: String,
@@ -79,9 +81,9 @@ pub struct Payout {
     pub amount: WrappedBalance,
 }
 
-
-type Payouts = UnorderedMap<AccountId, Vec<Payout>>;
-type Events = UnorderedMap<u64, Event>;
+type EventId = u64;
+type Payouts = UnorderedMap<EventId, Vec<Payout>>;
+type Events = UnorderedMap<EventId, Event>;
 
 // Structs in Rust are similar to other languages, and may include impl keyword as shown below
 // Note: the names of the structs are not important when calling the smart contract, but the function names are
@@ -119,8 +121,11 @@ impl Giveaway {
     #[payable]
     pub fn add_event(&mut self, event: EventInput) -> u64 {
         let tokens: Balance = near_sdk::env::attached_deposit();
-//TODO: check asserts
+        //TODO: check more asserts
+        // check blocks
         assert!(tokens >= MIN_DEPOSIT_AMOUNT, "Not enough deposit");
+        assert!(event.rewards.len() < MAX_DRAW, "Too many rewards");
+
         assert!(
             event.description.len() < MAX_DESCRIPTION_LENGTH,
             "Description length is too long"
@@ -158,9 +163,10 @@ impl Giveaway {
             participants: event.participants,
             allow_duplicate_participants: event.allow_duplicate_participants,
 
-            add_participants_start_date: event.add_participants_start_date.into(),
-            add_participants_end_date: event.add_participants_end_date.into(),
-            event_date: event.event_date.into(),
+            add_participants_start_block: event.add_participants_start_block.into(),
+            add_participants_end_block: event.add_participants_end_block.into(),
+            event_block: event.event_block.into(),
+            finalized_block: 0.into(),
 
             title: event.title,
             description: event.description,
@@ -172,6 +178,7 @@ impl Giveaway {
     }
 
     pub fn insert_participants(&mut self, event_id: u64, participants: Vec<AccountId>) -> bool {
+        // TODO check blocks
         match self.events.get(&event_id) {
             Some(mut event) => {
                 let account_id = env::predecessor_account_id();
@@ -198,40 +205,81 @@ impl Giveaway {
     }
 
     pub fn finalize_event(&mut self, event_id: u64) -> bool {
+        // TODO check blocks
         match self.events.get(&event_id) {
-            Some(event) => {
+            Some(mut event) => {
                 assert!(event.status == EventStatus::Pending, "Already finalized");
                 assert!(event.rewards.len() > 0, "Rewards Missing");
                 assert!(event.participants.len() > 0, "Participants Missing");
 
+                event.status = EventStatus::Success;
+                event.finalized_block = env::block_timestamp().into();
+                self.events.insert(&event_id, &event);
+
                 let mut payouts: Vec<Payout> = vec![];
+                let mut winners: Vec<AccountId> = vec![];
                 let max_participants: usize = event.participants.len();
                 let max_rewards: usize = event.rewards.len();
                 let mut index = 0;
                 let seed = near_sdk::env::random_seed();
                 for reward in event.rewards {
-                    let winner_index = (u64::from(seed[index]) % (max_participants as u64));
+                    let mut winner_account_id: AccountId = "".to_string();
 
-                    let winner_account_id: AccountId = event.participants[winner_index as usize].clone();
-                    let payout = Payout {
-                        account_id: winner_account_id.clone(),
-                        amount: reward,
-                    };
-                    payouts.push(payout);
+                    while winners.contains(&winner_account_id) || winner_account_id == "" {
+                        if winner_account_id != "" {
+                            index += 1;
+                        }
+                        else{
+                         if winners.len() >= event.participants.len() {
+                             // TODO return the rest
+                             env::log(
+                                 format!("All participants got prizes. Return the rest to the event owner",
+                                         ).as_bytes(),
+                             );
+                             winner_account_id = "".to_string();
+                             break;
+                         }
+                        }
+                        let winner_index:u64 = u64::from(seed[index]) % (max_participants as u64);
+                        winner_account_id = event.participants[winner_index as usize].clone();
 
-                    env::log(
-                        format!(
-                            "Draw #{}. @{} won reward of {}yNEAR",
-                            winner_index, winner_account_id, reward.0
-                        ).as_bytes(),
-                    );
+                       if index >= MAX_DRAW {
+                           index = 0;
+                           env::log(
+                               format!("Reset index").as_bytes(),
+                           );
+                       }
+                    }
+
+                    if winner_account_id != "" {
+                        winners.push(winner_account_id.clone());
+                        let payout = Payout {
+                            account_id: winner_account_id.clone(),
+                            amount: reward,
+                        };
+                        payouts.push(payout);
+
+                        env::log(
+                            format!("@{} won reward of {}yNEAR",
+                                    winner_account_id, reward.0).as_bytes(),
+                        );
+                        // TODO send tokens
+                    }
 
                     if payouts.len() >= max_rewards {
                         break;
                     }
 
                     index += 1;
+                    if index >= MAX_DRAW {
+                        index = 0;
+                        env::log(
+                            format!("Reset index").as_bytes(),
+                        );
+                    }
                 }
+
+                self.payouts.insert(&event_id, &payouts);
                 true
             }
             None => {
@@ -250,6 +298,13 @@ impl Giveaway {
     pub fn get_event(&self, id: u64) -> Option<Event> {
         match self.events.get(&id) {
             Some(event) => Some(event),
+            None => None,
+        }
+    }
+
+    pub fn get_payout(&self, event_id: u64) -> Option<Vec<Payout>> {
+        match self.payouts.get(&event_id) {
+            Some(payout) => Some(payout),
             None => None,
         }
     }
