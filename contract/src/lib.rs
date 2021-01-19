@@ -29,7 +29,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000;
 const MAX_DESCRIPTION_LENGTH: usize = 280;
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Event {
     owner_account_id: AccountId,
@@ -76,7 +76,7 @@ pub enum EventStatus {
 #[serde(crate = "near_sdk::serde")]
 pub struct Payout {
     pub account_id: AccountId,
-    pub amount: Balance,
+    pub amount: WrappedBalance,
 }
 
 
@@ -195,10 +195,51 @@ impl Giveaway {
                 false
             }
         }
-
-
     }
 
+    pub fn finalize_event(&mut self, event_id: u64) -> bool {
+        match self.events.get(&event_id) {
+            Some(event) => {
+                assert!(event.status == EventStatus::Pending, "Already finalized");
+                assert!(event.rewards.len() > 0, "Rewards Missing");
+                assert!(event.participants.len() > 0, "Participants Missing");
+
+                let mut payouts: Vec<Payout> = vec![];
+                let max_participants: usize = event.participants.len();
+                let max_rewards: usize = event.rewards.len();
+                let mut index = 0;
+                let seed = near_sdk::env::random_seed();
+                for reward in event.rewards {
+                    let winner_index = (u64::from(seed[index]) % (max_participants as u64));
+
+                    let winner_account_id: AccountId = event.participants[winner_index as usize].clone();
+                    let payout = Payout {
+                        account_id: winner_account_id.clone(),
+                        amount: reward,
+                    };
+                    payouts.push(payout);
+
+                    env::log(
+                        format!(
+                            "Draw #{}. @{} won reward of {}yNEAR",
+                            winner_index, winner_account_id, reward.0
+                        ).as_bytes(),
+                    );
+
+                    if payouts.len() >= max_rewards {
+                        break;
+                    }
+
+                    index += 1;
+                }
+                true
+            }
+            None => {
+                env::log(format!("Unknown event").as_bytes());
+                false
+            }
+        }
+    }
 
     pub fn get_events(&self, from_index: u64, limit: u64) -> HashMap<u64, Event> {
         (from_index..std::cmp::min(from_index + limit, self.events.len()))
