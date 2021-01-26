@@ -17,7 +17,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedMap;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::wee_alloc;
-use near_sdk::{env, near_bindgen, AccountId, Balance, Promise};
+use near_sdk::{env, near_bindgen, AccountId, Balance, Promise, Gas, ext_contract};
 
 use std::collections::HashMap;
 
@@ -25,12 +25,24 @@ use std::collections::HashMap;
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
+const MAX_DRAW_SIZE: usize = 32;
 //const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000_000_000;
 const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000;
 const MAX_DESCRIPTION_LENGTH: usize = 280;
-const MAX_DRAW: usize = 32;
+const MAX_TITLE_LENGTH: usize = 128;
+const MAX_URL_SIZE: usize = 256;
 
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
+const SERVICE_COMMISSION: Balance = 10_000_000_000_000_000_000;
+
+const BASE: Gas = 25_000_000_000_000;
+
+#[ext_contract(multisender)]
+pub trait ExtMultisender {
+    fn multisend_attached_tokens(&self, accounts: Vec<Payout>);
+}
+
+
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Event {
     owner_account_id: AccountId,
@@ -118,18 +130,24 @@ impl Giveaway {
         giveaway
     }
 
+    fn get_multisender_contract() -> String {
+        //  multisender.app.near for Mainnet, dev-1611689128537-1966413 for Testnet
+        "dev-1611689128537-1966413".to_string()
+    }
+
     #[payable]
     pub fn add_event(&mut self, event: EventInput) -> u64 {
         let tokens: Balance = near_sdk::env::attached_deposit();
-        //TODO: check more asserts
         // check blocks
         assert!(tokens >= MIN_DEPOSIT_AMOUNT, "Not enough deposit");
-        assert!(event.rewards.len() < MAX_DRAW, "Too many rewards");
+        assert!(event.rewards.len() < MAX_DRAW_SIZE, "Too many rewards");
 
-        assert!(
-            event.description.len() < MAX_DESCRIPTION_LENGTH,
-            "Description length is too long"
-        );
+        assert!(event.description.len() < MAX_DESCRIPTION_LENGTH, "Description length is too long");
+        assert!(event.title.len() < MAX_TITLE_LENGTH, "Title length is too long");
+        assert!(event.image.len() < MAX_URL_SIZE, "Image url is too long");
+        assert!(event.link.len() < MAX_URL_SIZE, "Link url is too long");
+
+        //TODO: check timestamps
 
         let event_id = self.events.len() as u64;
         let owner_id = env::predecessor_account_id();
@@ -139,14 +157,16 @@ impl Giveaway {
             total += amount.0;
         }
 
+        let payment: Balance = total + SERVICE_COMMISSION;
+
         assert!(
-            total <= tokens,
-            "Not enough attached tokens to provide rewards (Attached: {}. Total rewards: {})",
-            tokens, total
+            payment <= tokens,
+            "Not enough attached tokens to provide rewards (Attached: {}. Total rewards: {}, Service commission: {})",
+            tokens, total, SERVICE_COMMISSION
         );
 
-        if total < tokens {
-            let tokens_to_return = tokens - total;
+        if payment < tokens {
+            let tokens_to_return = tokens - payment;
             env::log(
                 format!(
                     "@{} withdrawing extra {}",
@@ -222,33 +242,33 @@ impl Giveaway {
                 let max_rewards: usize = event.rewards.len();
                 let mut index = 0;
                 let seed = near_sdk::env::random_seed();
+                let mut total: Balance = 0;
                 for reward in event.rewards {
                     let mut winner_account_id: AccountId = "".to_string();
 
                     while winners.contains(&winner_account_id) || winner_account_id == "" {
                         if winner_account_id != "" {
                             index += 1;
+                        } else {
+                            if winners.len() >= event.participants.len() {
+                                // TODO return the rest
+                                env::log(
+                                    format!("All participants got prizes. Return the rest to the event owner",
+                                    ).as_bytes(),
+                                );
+                                winner_account_id = "".to_string();
+                                break;
+                            }
                         }
-                        else{
-                         if winners.len() >= event.participants.len() {
-                             // TODO return the rest
-                             env::log(
-                                 format!("All participants got prizes. Return the rest to the event owner",
-                                         ).as_bytes(),
-                             );
-                             winner_account_id = "".to_string();
-                             break;
-                         }
-                        }
-                        let winner_index:u64 = u64::from(seed[index]) % (max_participants as u64);
+                        let winner_index: u64 = u64::from(seed[index]) % (max_participants as u64);
                         winner_account_id = event.participants[winner_index as usize].clone();
 
-                       if index >= MAX_DRAW {
-                           index = 0;
-                           env::log(
-                               format!("Reset index").as_bytes(),
-                           );
-                       }
+                        if index >= MAX_DRAW_SIZE {
+                            index = 0;
+                            env::log(
+                                format!("Reset index").as_bytes(),
+                            );
+                        }
                     }
 
                     if winner_account_id != "" {
@@ -257,13 +277,13 @@ impl Giveaway {
                             account_id: winner_account_id.clone(),
                             amount: reward,
                         };
+                        total += reward.0;
                         payouts.push(payout);
 
                         env::log(
                             format!("@{} won reward of {}yNEAR",
                                     winner_account_id, reward.0).as_bytes(),
                         );
-                        // TODO send tokens
                     }
 
                     if payouts.len() >= max_rewards {
@@ -271,13 +291,15 @@ impl Giveaway {
                     }
 
                     index += 1;
-                    if index >= MAX_DRAW {
+                    if index >= MAX_DRAW_SIZE {
                         index = 0;
                         env::log(
                             format!("Reset index").as_bytes(),
                         );
                     }
                 }
+
+                multisender::multisend_attached_tokens(payouts.clone(), &Giveaway::get_multisender_contract(), total, BASE);
 
                 self.payouts.insert(&event_id, &payouts);
                 true
