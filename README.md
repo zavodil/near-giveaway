@@ -1,14 +1,25 @@
-export NODE_ENV=testnet
-export CONTRACT_ID="dev-1611011650251-6070733"
+Permissionless decentralized random giveaways on NEAR Blockchain
 
+* Create an event, provide a list of rewards and participants 
+* Add more participants if you like
+* Finalize the lottery event: winners will be selected by decentralized randomness and they will immediately receive their rewards
 
-near call $CONTRACT_ID add_event '{"event": {"rewards": ["2500000000000000000000","2500000000000000000000","2500000000000000000000"], "participants":  ["test1", "test2", "test3"], "allow_duplicate_participants": false,  "add_participants_start_date" : "1", "add_participants_end_date": "2", "event_date": "3", "title": "String", "description": "String", "image": "String", "link": "String"}}' --accountId=zavodil.testnet --amount 0.0075
+Parameters:
 
-near view $CONTRACT_ID  get_events '{"from_index":0, "limit":20}'
-near view $CONTRACT_ID  get_event '{"id":0}'
+* rewards (Array)
+* participants (Array)    
+* allow_duplicate_participants (Bool)
+* add_participants_start (Unix Timestamp)
+* add_participants_end (Unix Timestamp)
+* event (Unix Timestamp)
+* title (String)
+* description (String)
 
-near call $CONTRACT_ID insert_participants '{"event_id":0, "participants":  ["test4", "test7", "test8"]}' --accountId=zavodil.testnet
-
+Public view methods:
+* get_events
+* get_event
+* get_payouts 
+* get_events_to_finalize
 
 near-giveaway
 ==================

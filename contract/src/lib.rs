@@ -350,7 +350,7 @@ impl Giveaway {
         }
     }
 
-    pub fn get_payout(&self, event_id: u64) -> Option<Vec<Payout>> {
+    pub fn get_payouts(&self, event_id: u64) -> Option<Vec<Payout>> {
         match self.payouts.get(&event_id) {
             Some(payout) => Some(payout),
             None => None,
