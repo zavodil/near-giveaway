@@ -12,7 +12,7 @@
  */
 
 // To conserve gas, efficient serialization is achieved through Borsh (http://borsh.io/)
-use near_lib::types::{WrappedBalance, WrappedDuration};
+use near_lib::types::{WrappedBalance, WrappedDuration, Duration};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedMap;
 use near_sdk::serde::{Deserialize, Serialize};
@@ -26,11 +26,9 @@ use std::collections::HashMap;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 const MAX_DRAW_SIZE: usize = 32;
-//const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000_000_000;
-const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000;
+const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000_000_000;
 const MAX_DESCRIPTION_LENGTH: usize = 280;
 const MAX_TITLE_LENGTH: usize = 128;
-const MAX_URL_SIZE: usize = 256;
 
 const SERVICE_COMMISSION: Balance = 10_000_000_000_000_000_000;
 
@@ -51,15 +49,13 @@ pub struct Event {
 
     participants: Vec<AccountId>,
     allow_duplicate_participants: bool,
-    add_participants_start_block: WrappedDuration,
-    add_participants_end_block: WrappedDuration,
-    event_block: WrappedDuration,
-    finalized_block: WrappedDuration,
+    add_participants_start: WrappedDuration,
+    add_participants_end: WrappedDuration,
+    event: WrappedDuration,
+    finalized: WrappedDuration,
 
     title: String,
-    description: String,
-    image: String,
-    link: String,
+    description: String
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -69,14 +65,12 @@ pub struct EventInput {
     participants: Vec<AccountId>,
     allow_duplicate_participants: bool,
 
-    add_participants_start_block: WrappedDuration,
-    add_participants_end_block: WrappedDuration,
-    event_block: WrappedDuration,
+    add_participants_start: WrappedDuration,
+    add_participants_end: WrappedDuration,
+    event: WrappedDuration,
 
     title: String,
-    description: String,
-    image: String,
-    link: String,
+    description: String
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
@@ -138,16 +132,18 @@ impl Giveaway {
     #[payable]
     pub fn add_event(&mut self, event: EventInput) -> u64 {
         let tokens: Balance = near_sdk::env::attached_deposit();
-        // check blocks
+
         assert!(tokens >= MIN_DEPOSIT_AMOUNT, "Not enough deposit");
         assert!(event.rewards.len() < MAX_DRAW_SIZE, "Too many rewards");
+        assert!(event.rewards.len() > 0, "Missing rewards");
 
         assert!(event.description.len() < MAX_DESCRIPTION_LENGTH, "Description length is too long");
         assert!(event.title.len() < MAX_TITLE_LENGTH, "Title length is too long");
-        assert!(event.image.len() < MAX_URL_SIZE, "Image url is too long");
-        assert!(event.link.len() < MAX_URL_SIZE, "Link url is too long");
 
-        //TODO: check timestamps
+        assert!(
+            env::block_timestamp() <= event.add_participants_end.into() || event.participants.len() > 0,
+            "Abort. Update `add_participants_end` or provide participants"
+        );
 
         let event_id = self.events.len() as u64;
         let owner_id = env::predecessor_account_id();
@@ -183,24 +179,36 @@ impl Giveaway {
             participants: event.participants,
             allow_duplicate_participants: event.allow_duplicate_participants,
 
-            add_participants_start_block: event.add_participants_start_block.into(),
-            add_participants_end_block: event.add_participants_end_block.into(),
-            event_block: event.event_block.into(),
-            finalized_block: 0.into(),
+            add_participants_start: event.add_participants_start.into(),
+            add_participants_end: event.add_participants_end.into(),
+            event: event.event.into(),
+            finalized: 0.into(),
 
             title: event.title,
-            description: event.description,
-            image: event.image,
-            link: event.link,
+            description: event.description
         };
         self.events.insert(&event_id, &e);
         event_id
     }
 
     pub fn insert_participants(&mut self, event_id: u64, participants: Vec<AccountId>) -> bool {
-        // TODO check blocks
         match self.events.get(&event_id) {
             Some(mut event) => {
+                assert!(event.status == EventStatus::Pending, "Already finalized");
+
+                let current_timestamp: Duration = env::block_timestamp();
+                assert!(
+                    current_timestamp >= event.add_participants_start.into(),
+                    "It's too early to add participants. Please wait for block {}. Current blocK: {}",
+                    event.add_participants_start.0, current_timestamp
+                );
+
+                assert!(
+                    current_timestamp <= event.add_participants_end.into(),
+                    "It's too late to add participants. Process finished at block {}. Current blocK: {}",
+                    event.add_participants_end.0, current_timestamp
+                );
+
                 let account_id = env::predecessor_account_id();
                 assert!(
                     event.owner_account_id == account_id,
@@ -209,8 +217,9 @@ impl Giveaway {
                 );
 
                 for participant in participants {
-                    // TODO check duplicate participants if allow_duplicate_participants
-                    event.participants.push(participant)
+                    if !(!event.allow_duplicate_participants && event.participants.contains(&participant)) {
+                        event.participants.push(participant)
+                    }
                 }
 
                 self.events.insert(&event_id, &event);
@@ -232,8 +241,14 @@ impl Giveaway {
                 assert!(event.rewards.len() > 0, "Rewards Missing");
                 assert!(event.participants.len() > 0, "Participants Missing");
 
+                assert!(
+                    env::block_timestamp() >= event.event.into(),
+                    "It's too early to finalize the event. Please wait for block {}",
+                    event.event.0
+                );
+
                 event.status = EventStatus::Success;
-                event.finalized_block = env::block_timestamp().into();
+                event.finalized = env::block_timestamp().into();
                 self.events.insert(&event_id, &event);
 
                 let mut payouts: Vec<Payout> = vec![];
@@ -309,6 +324,17 @@ impl Giveaway {
                 false
             }
         }
+    }
+
+    pub fn get_events_to_finalize(&self, from_index: u64, limit: u64) -> HashMap<u64, Event> {
+        let current_timestamp = env::block_timestamp();
+        (from_index..std::cmp::min(from_index + limit, self.events.len()))
+            .filter(|index| {
+                let event =self.events.get(&index.clone()).unwrap();
+                event.status == EventStatus::Pending && current_timestamp >= event.event.into()
+            })
+            .map(|index| (index, self.events.get(&index).unwrap()))
+            .collect()
     }
 
     pub fn get_events(&self, from_index: u64, limit: u64) -> HashMap<u64, Event> {
