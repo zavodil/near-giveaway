@@ -199,13 +199,13 @@ impl Giveaway {
                 let current_timestamp: Duration = env::block_timestamp();
                 assert!(
                     current_timestamp >= event.add_participants_start.into(),
-                    "It's too early to add participants. Please wait for block {}. Current blocK: {}",
+                    "It's too early to add participants. Please wait for block {}. Current block: {}",
                     event.add_participants_start.0, current_timestamp
                 );
 
                 assert!(
                     current_timestamp <= event.add_participants_end.into(),
-                    "It's too late to add participants. Process finished at block {}. Current blocK: {}",
+                    "It's too late to add participants. Process finished at block {}. Current block: {}",
                     event.add_participants_end.0, current_timestamp
                 );
 
@@ -234,7 +234,6 @@ impl Giveaway {
     }
 
     pub fn finalize_event(&mut self, event_id: u64) -> bool {
-        // TODO check blocks
         match self.events.get(&event_id) {
             Some(mut event) => {
                 assert!(event.status == EventStatus::Pending, "Already finalized");
