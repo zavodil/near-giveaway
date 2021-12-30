@@ -9,6 +9,7 @@
 #keys
 /neardev
 
+/contract/target
 
 # testing
 /coverage

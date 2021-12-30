@@ -12,15 +12,14 @@
  */
 
 // To conserve gas, efficient serialization is achieved through Borsh (http://borsh.io/)
-use near_lib::types::{WrappedBalance, WrappedDuration, Duration};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedMap;
+use near_sdk::json_types::{WrappedBalance, WrappedDuration};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::wee_alloc;
-use near_sdk::{env, near_bindgen, AccountId, Balance, Promise, Gas, ext_contract};
+use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Gas, Promise};
+use near_sdk::{wee_alloc, Duration};
 
 use std::collections::HashMap;
-
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -39,7 +38,6 @@ pub trait ExtMultisender {
     fn multisend_attached_tokens(&self, accounts: Vec<Payout>);
 }
 
-
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Event {
@@ -55,7 +53,7 @@ pub struct Event {
     finalized: WrappedDuration,
 
     title: String,
-    description: String
+    description: String,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -70,7 +68,7 @@ pub struct EventInput {
     event: WrappedDuration,
 
     title: String,
-    description: String
+    description: String,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
@@ -137,11 +135,18 @@ impl Giveaway {
         assert!(event.rewards.len() < MAX_DRAW_SIZE, "Too many rewards");
         assert!(event.rewards.len() > 0, "Missing rewards");
 
-        assert!(event.description.len() < MAX_DESCRIPTION_LENGTH, "Description length is too long");
-        assert!(event.title.len() < MAX_TITLE_LENGTH, "Title length is too long");
+        assert!(
+            event.description.len() < MAX_DESCRIPTION_LENGTH,
+            "Description length is too long"
+        );
+        assert!(
+            event.title.len() < MAX_TITLE_LENGTH,
+            "Title length is too long"
+        );
 
         assert!(
-            env::block_timestamp() <= event.add_participants_end.into() || event.participants.len() > 0,
+            env::block_timestamp() <= event.add_participants_end.into()
+                || event.participants.len() > 0,
             "Abort. Update `add_participants_end` or provide participants"
         );
 
@@ -163,12 +168,7 @@ impl Giveaway {
 
         if payment < tokens {
             let tokens_to_return = tokens - payment;
-            env::log(
-                format!(
-                    "@{} withdrawing extra {}",
-                    owner_id, tokens_to_return
-                ).as_bytes(),
-            );
+            env::log(format!("@{} withdrawing extra {}", owner_id, tokens_to_return).as_bytes());
             Promise::new(owner_id.clone()).transfer(tokens_to_return);
         }
 
@@ -185,7 +185,7 @@ impl Giveaway {
             finalized: 0.into(),
 
             title: event.title,
-            description: event.description
+            description: event.description,
         };
         self.events.insert(&event_id, &e);
         event_id
@@ -213,11 +213,14 @@ impl Giveaway {
                 assert!(
                     event.owner_account_id == account_id,
                     "User @{} doesn't have access to this event. Current owner: @{}",
-                    account_id, event.owner_account_id
+                    account_id,
+                    event.owner_account_id
                 );
 
                 for participant in participants {
-                    if !(!event.allow_duplicate_participants && event.participants.contains(&participant)) {
+                    if !(!event.allow_duplicate_participants
+                        && event.participants.contains(&participant))
+                    {
                         event.participants.push(participant)
                     }
                 }
@@ -279,9 +282,7 @@ impl Giveaway {
 
                         if index >= MAX_DRAW_SIZE {
                             index = 0;
-                            env::log(
-                                format!("Reset index").as_bytes(),
-                            );
+                            env::log(format!("Reset index").as_bytes());
                         }
                     }
 
@@ -295,8 +296,8 @@ impl Giveaway {
                         payouts.push(payout);
 
                         env::log(
-                            format!("@{} won reward of {}yNEAR",
-                                    winner_account_id, reward.0).as_bytes(),
+                            format!("@{} won reward of {}yNEAR", winner_account_id, reward.0)
+                                .as_bytes(),
                         );
                     }
 
@@ -307,13 +308,16 @@ impl Giveaway {
                     index += 1;
                     if index >= MAX_DRAW_SIZE {
                         index = 0;
-                        env::log(
-                            format!("Reset index").as_bytes(),
-                        );
+                        env::log(format!("Reset index").as_bytes());
                     }
                 }
 
-                multisender::multisend_attached_tokens(payouts.clone(), &Giveaway::get_multisender_contract(), total, BASE);
+                multisender::multisend_attached_tokens(
+                    payouts.clone(),
+                    &Giveaway::get_multisender_contract(),
+                    total,
+                    BASE,
+                );
 
                 self.payouts.insert(&event_id, &payouts);
                 true
@@ -329,7 +333,7 @@ impl Giveaway {
         let current_timestamp = env::block_timestamp();
         (from_index..std::cmp::min(from_index + limit, self.events.len()))
             .filter(|index| {
-                let event =self.events.get(&index.clone()).unwrap();
+                let event = self.events.get(&index.clone()).unwrap();
                 event.status == EventStatus::Pending && current_timestamp >= event.event.into()
             })
             .map(|index| (index, self.events.get(&index).unwrap()))
@@ -401,11 +405,11 @@ mod tests {
         let context = get_context(vec![], false);
         testing_env!(context);
         let mut contract = Giveaway::default();
-        contract.set_greeting("howdy".to_string());
-        assert_eq!(
-            "howdy".to_string(),
-            contract.get_greeting("bob_near".to_string())
-        );
+        // contract.set_greeting("howdy".to_string());
+        // assert_eq!(
+        //     "howdy".to_string(),
+        //     contract.get_greeting("bob_near".to_string())
+        // );
     }
 
     #[test]
@@ -414,9 +418,9 @@ mod tests {
         testing_env!(context);
         let contract = Giveaway::default();
         // this test did not call set_greeting so should return the default "Hello" greeting
-        assert_eq!(
-            "Hello".to_string(),
-            contract.get_greeting("francis.near".to_string())
-        );
+        // assert_eq!(
+        //     "Hello".to_string(),
+        //     contract.get_greeting("francis.near".to_string())
+        // );
     }
 }
