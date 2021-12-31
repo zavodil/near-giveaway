@@ -53,15 +53,15 @@ const Events = ({
     contract
       .add_event(
         {
-          event: {
+          event_input: {
             title,
             description,
             rewards,
             participants,
             allow_duplicate_participants: allowDuplicates,
-            event: toNano(eventDate),
-            add_participants_start: toNano(addParticipantsStartDate),
-            add_participants_end: toNano(addParticipantsEndDate),
+            event_timestamp: toNano(eventDate),
+            add_participants_start_timestamp: toNano(addParticipantsStartDate),
+            add_participants_end_timestamp: toNano(addParticipantsEndDate),
           },
         },
         BOATLOAD_OF_GAS,

@@ -27,13 +27,15 @@ const EventDetails = ({
     currentUser &&
     event.owner_account_id === currentUser.accountId;
 
-  const eventDate = toDate(event.event);
+  const eventDate = toDate(event.event_timestamp);
   const finalizedDate =
-    event.finalized && event.finalized !== "0"
-      ? toDate(event.finalized)
+    event.finalized_timestamp && event.finalized_timestamp !== "0"
+      ? toDate(event.finalized_timestamp)
       : undefined;
-  const addParticipantsStartDate = toDate(event.add_participants_start);
-  const addParticipantsEndDate = toDate(event.add_participants_end);
+  const addParticipantsStartDate = toDate(
+    event.add_participants_start_timestamp
+  );
+  const addParticipantsEndDate = toDate(event.add_participants_end_timestamp);
 
   const finalizeEvent = () => {};
 
