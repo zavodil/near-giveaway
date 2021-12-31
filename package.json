@@ -14,12 +14,14 @@
     "prestart": "npm run build:contract:debug && npm run dev:deploy:contract",
     "start": "export PORT=39106 && echo The app is starting! It will automatically open in your browser when ready && env-cmd -f ./neardev/dev-account.env parcel src/index.html --open",
     "dev": "export PORT=39106 && nodemon --watch contract/src -e rs --exec \"npm run start\"",
-    "test": "npm run build:contract:debug && cd contract && cargo test -- --nocapture && cd .. && jest test --runInBand",
+    "test:rust": "npm run build:contract:debug && cd contract && cargo test -- --nocapture && cd .. && jest test --runInBand",
     "build:web:testnet": "export NODE_ENV=testnet && rm -r testnet && parcel build src/index.html --public-url ./ && mv dist testnet",
     "build:contract:testnet": "export NODE_ENV=testnet && node contract/compile.js",
     "deploy:contract:testnet": "export NODE_ENV=testnet && near deploy",
     "build:web:all": "export NODE_ENV=mainnet && rm -r mainnet && parcel build src/index.html --public-url ./ && mv dist mainnet && export NODE_ENV=testnet && rm -r testnet && parcel build src/index.html --public-url ./ && mv dist testnet",
-    "dev:clear": "rm -r neardev"
+    "dev:clear": "rm -r neardev",
+    "test": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js --useStderr --verbose false",
+    "test:1": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js -t 'Create Event' --useStderr --verbose false"
   },
   "devDependencies": {
     "@babel/core": "~7.12.3",
@@ -37,7 +39,9 @@
     "shelljs": "~0.8.4"
   },
   "dependencies": {
+    "cross-env": "^7.0.3",
     "near-api-js": "~0.35.0",
+    "node-fetch": "^2.6.1",
     "react": "~17.0.1",
     "react-dom": "~17.0.1",
     "regenerator-runtime": "~0.13.5"
