@@ -1,0 +1,146 @@
+import { Fragment, useEffect, useState } from "react";
+import { Transition } from "@headlessui/react";
+import { useTimeoutFn } from "react-use";
+import { toDate, formatDate } from "./utils";
+
+const EventCard = ({
+  currentEvent,
+  index,
+  delay,
+  contract,
+  currentUser,
+  nearConfig,
+  wallet,
+  onLoading,
+  onEventSelected,
+}) => {
+  let [isShowing, setIsShowing] = useState(false);
+  let [isHovered, setIsHovered] = useState(false);
+  const [event, setEvent] = useState(currentEvent);
+
+  const eventDate = toDate(event.event);
+  const finalizedDate =
+    event.finalized && event.finalized !== "0"
+      ? toDate(event.finalized)
+      : undefined;
+  const addParticipantsStartDate = toDate(event.add_participants_start);
+  const addParticipantsEndDate = toDate(event.add_participants_end);
+
+  useEffect(() => {
+    if (onLoading) {
+      onLoading(true);
+      contract.get_event({ id: event.id }).then(
+        (event) => {
+          onLoading(false);
+          setEvent(event);
+        },
+        (err) => {
+          onLoading(false);
+        }
+      );
+    }
+  }, [contract, event.id, onLoading]);
+
+  let [, , resetIsShowing] = useTimeoutFn(
+    () => setIsShowing(true),
+    index * 200
+  );
+
+  useEffect(() => {
+    resetIsShowing();
+  }, [resetIsShowing]);
+
+  return (
+    <Transition
+      as={Fragment}
+      show={isShowing}
+      enter={`transform transition duration-[${delay}ms]`}
+      enterFrom="opacity-0 rotate-[-120deg] scale-50"
+      enterTo="opacity-100 rotate-0 scale-100"
+      leave="transform duration-200 transition ease-in-out"
+      leaveFrom="opacity-100 rotate-0 scale-100 "
+      leaveTo="opacity-0 scale-95 "
+    >
+      <div
+        onClick={() => onEventSelected(event)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`w-full bg-gradient-to-r ${
+          isHovered
+            ? "from-yellow-500 to-red-600"
+            : "from-yellow-400 to-red-500"
+        }  p-6 max-w-sm mx-auto rounded-xl flex-col shadow-md flex space-y-2 cursor-pointer`}
+      >
+        <div className="text-xl font-medium text-black text-center">
+          {event.title}
+        </div>
+        <div className="text-xl font-medium text-black break-all flex flex-row justify-start">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6 mr-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          {event.description}
+        </div>
+        <div className="text-md font-medium text-black text flex flex-row items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6 mr-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <p>Created: {formatDate(eventDate)}</p>
+          {finalizedDate && <p>Finalized: {formatDate(finalizedDate)}</p>}
+        </div>
+        <div className="text-sm font-medium text-black text flex flex-row items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6 mr-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+          <p>
+            Accept participants: {formatDate(addParticipantsStartDate)} -{" "}
+            {formatDate(addParticipantsEndDate)}
+          </p>
+        </div>
+        <div className="text-sm font-medium text-black text flex flex-row items-center">
+          {!event.participants ||
+            (event.participants &&
+              event.participants.length === 0 &&
+              "No participants yet, only owner can add new participants.")}
+          {event.participants &&
+            event.participants.length > 0 &&
+            `${event.participants.length} total participants.`}
+        </div>
+      </div>
+    </Transition>
+  );
+};
+
+export default EventCard;

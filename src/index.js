@@ -35,12 +35,13 @@ async function initContract() {
     walletConnection.account(),
     nearConfig.contractName,
     {
-      // View methods are read-only – they don't modify the state, but usually return some value
-      viewMethods: [],
-      // Change methods can modify the state, but you don't receive the returned value when called
-      changeMethods: [],
-      // Sender is the account ID to initialize transactions.
-      // getAccountId() will return empty string if user is still unauthorized
+      viewMethods: [
+        "get_event",
+        "get_events",
+        "get_events_to_finalize",
+        "get_payouts",
+      ],
+      changeMethods: ["add_event", "insert_participants", "finalize_event"],
       sender: walletConnection.getAccountId(),
     }
   );

@@ -13,7 +13,7 @@
     "deploy": "npm run build && npm run deploy:contract && npm run deploy:pages",
     "prestart": "npm run build:contract:debug && npm run dev:deploy:contract",
     "start": "echo The app is starting! It will automatically open in your browser when ready && craco start",
-    "dev": "export PORT=39106 && . ./neardev/dev-account.env && nodemon --watch contract/src -e rs --exec \"npm run start\"",
+    "dev": "export PORT=39106 && nodemon --watch contract/src -e rs --exec \"npm run start\"",
     "test": "npm run build:contract:debug && cd contract && cargo test -- --nocapture && cd .. && craco test",
     "build:web:testnet": "export NODE_ENV=testnet && rm -r testnet && parcel build src/index.html --public-url ./ && mv dist testnet",
     "build:contract:testnet": "export NODE_ENV=testnet && node contract/compile.js",
@@ -46,7 +46,9 @@
     "react-scripts": "4.0.3",
     "react-test-renderer": "~17.0.1",
     "react-use": "^17.3.1",
-    "regenerator-runtime": "~0.13.5"
+    "react-datetime-picker": "^3.4.3",
+    "regenerator-runtime": "~0.13.5",
+    "big.js": "^5.2.2"
   },
   "eslintConfig": {
     "extends": [

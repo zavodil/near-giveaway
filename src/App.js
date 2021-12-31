@@ -4,6 +4,7 @@ import PropTypes from "prop-types";
 import Authorization from "./Authorization";
 import LoadingIndicator from "./LoadingIndicator";
 import ErrorPopup from "./ErrorPopup";
+import Events from "./Events";
 
 const App = ({ contract, currentUser, nearConfig, wallet }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -20,20 +21,29 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
       />
       <ErrorPopup error={error} callback={() => setError("")} />
       <LoadingIndicator isLoading={isLoading} />
-      {currentUser &&
-        currentUser.accountId &&
-        `Hello, ${currentUser.accountId}!`}
+      {currentUser && currentUser.accountId && (
+        <Events
+          contract={contract}
+          currentUser={currentUser}
+          nearConfig={nearConfig}
+          wallet={wallet}
+          onLoading={setIsLoading}
+          onError={setError}
+        />
+      )}
     </div>
   );
 };
 
 App.propTypes = {
   contract: PropTypes.shape({
-    // get_games: PropTypes.func.isRequired,
-    // get_game: PropTypes.func.isRequired,
-    // create_game: PropTypes.func.isRequired,
-    // join_game: PropTypes.func.isRequired,
-    // make_move: PropTypes.func.isRequired,
+    get_events_to_finalize: PropTypes.func.isRequired,
+    get_events: PropTypes.func.isRequired,
+    get_event: PropTypes.func.isRequired,
+    get_payouts: PropTypes.func.isRequired,
+    add_event: PropTypes.func.isRequired,
+    insert_participants: PropTypes.func.isRequired,
+    finalize_event: PropTypes.func.isRequired,
   }).isRequired,
   currentUser: PropTypes.shape({
     accountId: PropTypes.string.isRequired,
