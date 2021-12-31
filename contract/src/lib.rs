@@ -1,160 +1,104 @@
-/*
- * This is an example of a Rust smart contract with two simple, symmetric functions:
- *
- * 1. set_greeting: accepts a greeting, such as "howdy", and records it for the user (account_id)
- *    who sent the request
- * 2. get_greeting: accepts an account_id and returns the greeting saved for it, defaulting to
- *    "Hello"
- *
- * Learn more about writing NEAR smart contracts with Rust:
- * https://github.com/near/near-sdk-rs
- *
- */
-
-// To conserve gas, efficient serialization is achieved through Borsh (http://borsh.io/)
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::UnorderedMap;
-use near_sdk::json_types::{WrappedBalance, WrappedDuration};
-use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Gas, Promise};
-use near_sdk::{wee_alloc, Duration};
-
 use std::collections::HashMap;
 
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+use near_sdk::{AccountId, Balance, BorshStorageKey, env, ext_contract, Gas, log, near_bindgen, PanicOnDefault, Promise};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::collections::{LookupSet, UnorderedMap, UnorderedSet, Vector};
+use near_sdk::json_types::{U128, U64};
+use near_sdk::serde::{Deserialize, Serialize};
 
-const MAX_DRAW_SIZE: usize = 32;
-const MIN_DEPOSIT_AMOUNT: u128 = 1_000_000_000_000_000_000_000_000;
+use crate::event::*;
+use crate::multisender::*;
+use crate::payout::*;
+
+mod event;
+mod payout;
+mod multisender;
+mod whitelist;
+mod utils;
+
+type WrappedBalance = U128;
+type WrappedDuration = U64;
+type Duration = u64;
+
+const MAX_GIVEAWAY_WINNERS: usize = 128;
+const MIN_DEPOSIT_AMOUNT: u128 = 10_000_000_000_000_000_000_000;
 const MAX_DESCRIPTION_LENGTH: usize = 280;
 const MAX_TITLE_LENGTH: usize = 128;
 
 const SERVICE_COMMISSION: Balance = 10_000_000_000_000_000_000;
 
-const BASE: Gas = 25_000_000_000_000;
+const BASE_PAYOUT_PREPARATION_GAS: Gas = Gas(25_000_000_000_000);
 
-#[ext_contract(multisender)]
-pub trait ExtMultisender {
-    fn multisend_attached_tokens(&self, accounts: Vec<Payout>);
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Event {
-    owner_account_id: AccountId,
-    status: EventStatus,
-    rewards: Vec<WrappedBalance>,
-
-    participants: Vec<AccountId>,
-    allow_duplicate_participants: bool,
-    add_participants_start: WrappedDuration,
-    add_participants_end: WrappedDuration,
-    event: WrappedDuration,
-    finalized: WrappedDuration,
-
-    title: String,
-    description: String,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
-pub struct EventInput {
-    rewards: Vec<WrappedBalance>,
-    participants: Vec<AccountId>,
-    allow_duplicate_participants: bool,
-
-    add_participants_start: WrappedDuration,
-    add_participants_end: WrappedDuration,
-    event: WrappedDuration,
-
-    title: String,
-    description: String,
-}
-
-#[derive(BorshSerialize, BorshDeserialize, Eq, PartialEq, Debug, Serialize, Deserialize, Clone)]
-#[serde(crate = "near_sdk::serde")]
-pub enum EventStatus {
-    Pending,
-    Success,
-}
-
-#[derive(Debug, Clone, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
-pub struct Payout {
-    pub account_id: AccountId,
-    pub amount: WrappedBalance,
-}
-
-type EventId = u64;
-type Payouts = UnorderedMap<EventId, Vec<Payout>>;
-type Events = UnorderedMap<EventId, Event>;
-
-// Structs in Rust are similar to other languages, and may include impl keyword as shown below
-// Note: the names of the structs are not important when calling the smart contract, but the function names are
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Giveaway {
+    owner_id: AccountId,
     active: bool,
-    events: Events,
-    payouts: Payouts,
+    next_event_id: u64,
+    events: UnorderedMap<EventId, Event>,
+    payouts: UnorderedMap<(EventId, PayoutIndex), Payout>,
+    /// Whitelisted tokens. None for native NEAR
+    whitelisted_tokens: LookupSet<TokenId>,
+    /// Contract of multisender app
+    multisender_contract: AccountId,
 }
 
-impl Default for Giveaway {
-    fn default() -> Self {
-        Self {
-            active: true,
-            events: UnorderedMap::new(b"e".to_vec()),
-            payouts: UnorderedMap::new(b"p".to_vec()),
-        }
-    }
+#[derive(BorshStorageKey, BorshSerialize)]
+pub(crate) enum StorageKey {
+    Events,
+    Payouts,
+    EventRewards { event_id: u64 },
+    EventParticipants { event_id: u64 },
+    WhitelistedTokens,
 }
 
 #[near_bindgen]
 impl Giveaway {
     #[init]
-    pub fn new() -> Self {
-        assert!(!env::state_exists(), "The contract is already initialized");
-        let giveaway = Self {
+    pub fn new(owner_id: AccountId, multisender_contract: Option<AccountId>) -> Self {
+        //  multisender.app.near for Mainnet, dev-1611689128537-1966413 for Testnet
+        Self {
+            owner_id,
             active: true,
-            events: UnorderedMap::new(b"e".to_vec()),
-            payouts: UnorderedMap::new(b"p".to_vec()),
-        };
-        giveaway
+            next_event_id: 0,
+            events: UnorderedMap::new(StorageKey::Events),
+            payouts: UnorderedMap::new(StorageKey::Payouts),
+            whitelisted_tokens: LookupSet::new(StorageKey::WhitelistedTokens),
+            multisender_contract: multisender_contract.unwrap_or_else(|| AccountId::new_unchecked("multisender.app.near".to_string())),
+        }
     }
 
-    fn get_multisender_contract() -> String {
-        //  multisender.app.near for Mainnet, dev-1611689128537-1966413 for Testnet
-        "dev-1611689128537-1966413".to_string()
+    pub fn get_multisender_contract(&self) -> AccountId {
+        self.multisender_contract.to_owned()
     }
 
     #[payable]
-    pub fn add_event(&mut self, event: EventInput) -> u64 {
-        let tokens: Balance = near_sdk::env::attached_deposit();
+    pub fn add_event(&mut self, event_input: EventInput) -> u64 {
+        self.assert_active();
+        self.assert_whitelisted_token(&event_input.rewards_token_id);
 
+        let tokens: Balance = env::attached_deposit();
+
+        let rewards_number = event_input.rewards.len();
+        assert!(rewards_number < MAX_GIVEAWAY_WINNERS, "Too many rewards");
+        assert!(rewards_number > 0, "Missing rewards");
         assert!(tokens >= MIN_DEPOSIT_AMOUNT, "Not enough deposit");
-        assert!(event.rewards.len() < MAX_DRAW_SIZE, "Too many rewards");
-        assert!(event.rewards.len() > 0, "Missing rewards");
+        assert!(event_input.description.len() < MAX_DESCRIPTION_LENGTH, "Description length is too long");
+        assert!(event_input.title.len() < MAX_TITLE_LENGTH, "Title length is too long");
 
+        let current_timestamp: Duration = env::block_timestamp();
+        // TODO remove. Difficult to test
+        // assert!(current_timestamp < event_input.event_timestamp.0, "Event date already passed");
         assert!(
-            event.description.len() < MAX_DESCRIPTION_LENGTH,
-            "Description length is too long"
-        );
-        assert!(
-            event.title.len() < MAX_TITLE_LENGTH,
-            "Title length is too long"
-        );
-
-        assert!(
-            env::block_timestamp() <= event.add_participants_end.into()
-                || event.participants.len() > 0,
-            "Abort. Update `add_participants_end` or provide participants"
+            current_timestamp < event_input.add_participants_end_timestamp.0 || !event_input.participants.is_empty(),
+            "Update `add_participants_end` or provide participants"
         );
 
-        let event_id = self.events.len() as u64;
+        let event_id = self.next_event_id;
         let owner_id = env::predecessor_account_id();
 
         let mut total: Balance = 0;
-        for amount in &event.rewards {
+        for amount in &event_input.rewards {
             total += amount.0;
         }
 
@@ -168,259 +112,166 @@ impl Giveaway {
 
         if payment < tokens {
             let tokens_to_return = tokens - payment;
-            env::log(format!("@{} withdrawing extra {}", owner_id, tokens_to_return).as_bytes());
+            log!("@{} withdrawing extra {}", owner_id, tokens_to_return);
             Promise::new(owner_id.clone()).transfer(tokens_to_return);
         }
 
-        let e = Event {
+        let mut rewards = UnorderedSet::new(StorageKey::EventRewards { event_id });
+        for input_reward in event_input.rewards {
+            rewards.insert(&input_reward);
+        }
+
+        let mut participants = Vector::new(StorageKey::EventParticipants { event_id });
+        for input_participant in event_input.participants {
+            participants.push(&input_participant);
+        }
+
+        let event = Event {
             status: EventStatus::Pending,
             owner_account_id: owner_id,
-            rewards: event.rewards,
-            participants: event.participants,
-            allow_duplicate_participants: event.allow_duplicate_participants,
+            rewards,
+            rewards_token_id: event_input.rewards_token_id,
+            participants,
+            allow_duplicate_participants: event_input.allow_duplicate_participants,
 
-            add_participants_start: event.add_participants_start.into(),
-            add_participants_end: event.add_participants_end.into(),
-            event: event.event.into(),
-            finalized: 0.into(),
+            add_participants_start_timestamp: event_input.add_participants_start_timestamp,
+            add_participants_end_timestamp: event_input.add_participants_end_timestamp,
+            event_timestamp: event_input.event_timestamp,
+            finalized_timestamp: None,
 
-            title: event.title,
-            description: event.description,
+            title: event_input.title,
+            description: event_input.description,
         };
-        self.events.insert(&event_id, &e);
+        self.events.insert(&event_id, &event);
+        self.next_event_id += 1;
+
         event_id
     }
 
-    pub fn insert_participants(&mut self, event_id: u64, participants: Vec<AccountId>) -> bool {
-        match self.events.get(&event_id) {
-            Some(mut event) => {
-                assert!(event.status == EventStatus::Pending, "Already finalized");
+    pub fn insert_participants(&mut self, event_id: u64, participants: Vec<AccountId>) {
+        self.assert_active();
+        let mut event: Event = self.internal_get_event(&event_id);
 
-                let current_timestamp: Duration = env::block_timestamp();
-                assert!(
-                    current_timestamp >= event.add_participants_start.into(),
-                    "It's too early to add participants. Please wait for block {}. Current block: {}",
-                    event.add_participants_start.0, current_timestamp
-                );
+        assert_eq!(event.status, EventStatus::Pending, "Already finalized");
 
-                assert!(
-                    current_timestamp <= event.add_participants_end.into(),
-                    "It's too late to add participants. Process finished at block {}. Current block: {}",
-                    event.add_participants_end.0, current_timestamp
-                );
 
-                let account_id = env::predecessor_account_id();
-                assert!(
-                    event.owner_account_id == account_id,
-                    "User @{} doesn't have access to this event. Current owner: @{}",
-                    account_id,
-                    event.owner_account_id
-                );
+        let current_timestamp: Duration = env::block_timestamp();
+        assert!(current_timestamp >= event.add_participants_start_timestamp.0, "It's too early to add participants");
+        assert!(current_timestamp < event.add_participants_end_timestamp.0, "It's too late to add participants");
+        assert!(current_timestamp < event.event_timestamp.0, "Event date already passed");
 
-                for participant in participants {
-                    if !(!event.allow_duplicate_participants
-                        && event.participants.contains(&participant))
-                    {
-                        event.participants.push(participant)
-                    }
-                }
+        self.assert_event_owner(&event);
 
-                self.events.insert(&event_id, &event);
-
-                true
-            }
-            None => {
-                env::log(format!("Unknown event").as_bytes());
-                false
+        for participant in participants {
+            if event.allow_duplicate_participants || event.participants.to_vec().contains(&participant) {
+                event.participants.push(&participant);
             }
         }
+
+        self.events.insert(&event_id, &event);
     }
 
-    pub fn finalize_event(&mut self, event_id: u64) -> bool {
-        match self.events.get(&event_id) {
-            Some(mut event) => {
-                assert!(event.status == EventStatus::Pending, "Already finalized");
-                assert!(event.rewards.len() > 0, "Rewards Missing");
-                assert!(event.participants.len() > 0, "Participants Missing");
+    pub fn finalize_event(&mut self, event_id: u64) {
+        self.assert_active();
+        let mut event: Event = self.internal_get_event(&event_id);
+        assert_eq!(event.status, EventStatus::Pending, "Already finalized");
+        assert!(!event.rewards.is_empty(), "Rewards Missing");
+        assert!(!event.participants.is_empty(), "Participants Missing");
 
-                assert!(
-                    env::block_timestamp() >= event.event.into(),
-                    "It's too early to finalize the event. Please wait for block {}",
-                    event.event.0
-                );
+        assert!(
+            env::block_timestamp() >= event.event_timestamp.0,
+            "It's too early to finalize the event. Please wait for block {}",
+            event.event_timestamp.0
+        );
 
-                event.status = EventStatus::Success;
-                event.finalized = env::block_timestamp().into();
-                self.events.insert(&event_id, &event);
+        event.status = EventStatus::Calculated;
+        event.finalized_timestamp = Some(env::block_timestamp().into());
+        self.events.insert(&event_id, &event);
 
-                let mut payouts: Vec<Payout> = vec![];
-                let mut winners: Vec<AccountId> = vec![];
-                let max_participants: usize = event.participants.len();
-                let max_rewards: usize = event.rewards.len();
-                let mut index = 0;
-                let seed = near_sdk::env::random_seed();
-                let mut total: Balance = 0;
-                for reward in event.rewards {
-                    let mut winner_account_id: AccountId = "".to_string();
+        // Total number of distributed payouts
+        let mut payouts_number: PayoutIndex = 0;
+        let mut winners: Vec<AccountId> = vec![];
+        let max_participants: usize = event.participants.len() as usize;
+        let max_rewards: PayoutIndex = event.rewards.len() as PayoutIndex;
+        let mut index = 0;
+        let seed = near_sdk::env::random_seed();
+        for reward in event.rewards.to_vec() {
+            let mut winner_account_id: Option<AccountId> = None;
 
-                    while winners.contains(&winner_account_id) || winner_account_id == "" {
-                        if winner_account_id != "" {
-                            index += 1;
-                        } else {
-                            if winners.len() >= event.participants.len() {
-                                // TODO return the rest
-                                env::log(
-                                    format!("All participants got prizes. Return the rest to the event owner",
-                                    ).as_bytes(),
-                                );
-                                winner_account_id = "".to_string();
-                                break;
-                            }
-                        }
-                        let winner_index: u64 = u64::from(seed[index]) % (max_participants as u64);
-                        winner_account_id = event.participants[winner_index as usize].clone();
-
-                        if index >= MAX_DRAW_SIZE {
-                            index = 0;
-                            env::log(format!("Reset index").as_bytes());
-                        }
-                    }
-
-                    if winner_account_id != "" {
-                        winners.push(winner_account_id.clone());
-                        let payout = Payout {
-                            account_id: winner_account_id.clone(),
-                            amount: reward,
-                        };
-                        total += reward.0;
-                        payouts.push(payout);
-
-                        env::log(
-                            format!("@{} won reward of {}yNEAR", winner_account_id, reward.0)
-                                .as_bytes(),
-                        );
-                    }
-
-                    if payouts.len() >= max_rewards {
-                        break;
-                    }
-
+            while winner_account_id.is_none() || winners.contains(&winner_account_id.clone().unwrap()) {
+                if winner_account_id.is_some() {
                     index += 1;
-                    if index >= MAX_DRAW_SIZE {
-                        index = 0;
-                        env::log(format!("Reset index").as_bytes());
-                    }
+                } else if winners.len() >= max_participants {
+                    log!("All participants got their prizes");
+                    winner_account_id = None;
+                    break;
                 }
+                let winner_index: u64 = u64::from(seed[index]) % (max_participants as u64);
+                winner_account_id = Some(event.participants.get(winner_index).unwrap());
 
-                multisender::multisend_attached_tokens(
-                    payouts.clone(),
-                    &Giveaway::get_multisender_contract(),
-                    total,
-                    BASE,
-                );
-
-                self.payouts.insert(&event_id, &payouts);
-                true
+                // TODO check this
+                if index >= MAX_GIVEAWAY_WINNERS {
+                    index = 0;
+                    log!("Reset index");
+                }
             }
-            None => {
-                env::log(format!("Unknown event").as_bytes());
-                false
+
+            if let Some(winner_account_id_value) = winner_account_id {
+                winners.push(winner_account_id_value.clone());
+
+                self.payouts.insert(&(event_id, payouts_number),
+                                    &Payout {
+                                        account_id: winner_account_id_value.clone(),
+                                        amount: reward,
+                                        token_id: event.rewards_token_id.to_owned(),
+                                        status: PayoutStatus::Pending,
+                                    });
+                payouts_number += 1;
+
+                log!("@{} won reward of {} yNEAR", winner_account_id_value, reward.0);
+            }
+
+            if payouts_number >= max_rewards {
+                break;
+            }
+
+            index += 1;
+            if index >= MAX_GIVEAWAY_WINNERS {
+                index = 0;
+                log!("Reset index");
             }
         }
     }
 
-    pub fn get_events_to_finalize(&self, from_index: u64, limit: u64) -> HashMap<u64, Event> {
-        let current_timestamp = env::block_timestamp();
-        (from_index..std::cmp::min(from_index + limit, self.events.len()))
-            .filter(|index| {
-                let event = self.events.get(&index.clone()).unwrap();
-                event.status == EventStatus::Pending && current_timestamp >= event.event.into()
-            })
-            .map(|index| (index, self.events.get(&index).unwrap()))
-            .collect()
-    }
+    pub fn distribute_payouts(&mut self, event_id: u64, from_index: u64, limit: u64) -> Promise {
+        self.assert_active();
+        let event: Event = self.internal_get_event(&event_id);
+        assert_eq!(event.status, EventStatus::Calculated, "Distribution is not available");
 
-    pub fn get_events(&self, from_index: u64, limit: u64) -> HashMap<u64, Event> {
-        (from_index..std::cmp::min(from_index + limit, self.events.len()))
-            .map(|index| (index, self.events.get(&index).unwrap()))
-            .collect()
-    }
+        let keys = self.payouts.keys_as_vector();
 
-    pub fn get_event(&self, id: u64) -> Option<Event> {
-        match self.events.get(&id) {
-            Some(event) => Some(event),
-            None => None,
+        let mut accounts: Vec<MultisenderPayout> = [].to_vec();
+        let mut total: Balance = 0;
+
+        for index in from_index..std::cmp::min(from_index + limit, keys.len()) {
+            let mut payout: Payout = self.payouts.get(&(event_id, index)).unwrap();
+            if payout.status == PayoutStatus::Pending {
+                accounts.push({
+                    MultisenderPayout {
+                        account_id: payout.account_id.to_owned(),
+                        token_id: None,
+                        amount: payout.amount,
+                    }
+                });
+                total += payout.amount.0;
+                payout.status = PayoutStatus::Complete;
+                self.payouts.insert(&(event_id, index), &payout);
+            }
         }
-    }
 
-    pub fn get_payouts(&self, event_id: u64) -> Option<Vec<Payout>> {
-        match self.payouts.get(&event_id) {
-            Some(payout) => Some(payout),
-            None => None,
-        }
-    }
-}
+        log!("Distributing rewards: {}", total);
 
-/*
- * The rest of this file holds the inline tests for the code above
- * Learn more about Rust tests: https://doc.rust-lang.org/book/ch11-01-writing-tests.html
- *
- * To run from contract directory:
- * cargo test -- --nocapture
- *
- * From project root, to run in combination with frontend tests:
- * yarn test
- *
- */
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use near_sdk::MockedBlockchain;
-    use near_sdk::{testing_env, VMContext};
-
-    // mock the context for testing, notice "signer_account_id" that was accessed above from env::
-    fn get_context(input: Vec<u8>, is_view: bool) -> VMContext {
-        VMContext {
-            current_account_id: "alice_near".to_string(),
-            signer_account_id: "bob_near".to_string(),
-            signer_account_pk: vec![0, 1, 2],
-            predecessor_account_id: "carol_near".to_string(),
-            input,
-            block_index: 0,
-            block_timestamp: 0,
-            account_balance: 0,
-            account_locked_balance: 0,
-            storage_usage: 0,
-            attached_deposit: 0,
-            prepaid_gas: 10u64.pow(18),
-            random_seed: vec![0, 1, 2],
-            is_view,
-            output_data_receivers: vec![],
-            epoch_height: 19,
-        }
-    }
-
-    #[test]
-    fn set_then_get_greeting() {
-        let context = get_context(vec![], false);
-        testing_env!(context);
-        let mut contract = Giveaway::default();
-        // contract.set_greeting("howdy".to_string());
-        // assert_eq!(
-        //     "howdy".to_string(),
-        //     contract.get_greeting("bob_near".to_string())
-        // );
-    }
-
-    #[test]
-    fn get_default_greeting() {
-        let context = get_context(vec![], true);
-        testing_env!(context);
-        let contract = Giveaway::default();
-        // this test did not call set_greeting so should return the default "Hello" greeting
-        // assert_eq!(
-        //     "Hello".to_string(),
-        //     contract.get_greeting("francis.near".to_string())
-        // );
+        let unspent_gas = env::prepaid_gas() - BASE_PAYOUT_PREPARATION_GAS;
+        ext_multisender::multisend_attached_tokens(accounts, self.multisender_contract.to_owned(), total, unspent_gas)
     }
 }
