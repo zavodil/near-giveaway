@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use near_sdk::{AccountId, Balance, BorshStorageKey, env, ext_contract, Gas, log, near_bindgen, PanicOnDefault, Promise};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupSet, UnorderedMap, UnorderedSet, Vector};
