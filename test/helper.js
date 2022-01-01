@@ -8,6 +8,10 @@ module.exports = {
         return (nearAPI.explorerUrl + "/accounts/" + process.env.CONTRACT_NAME);
     },
 
+    GetTxUrl: (id) => {
+        return (nearAPI.explorerUrl + "/transactions/" + id);
+    },
+
     GetNanosec: (date) => {
         return date.toString() + "000000";
     },

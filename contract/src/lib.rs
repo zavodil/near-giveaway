@@ -243,29 +243,31 @@ impl Giveaway {
         }
     }
 
-    pub fn distribute_payouts(&mut self, event_id: u64, from_index: u64, limit: u64) -> Promise {
+    pub fn distribute_payouts(&mut self, event_id: u64, from_index: Option<u64>, limit: Option<u64>) -> Promise {
         self.assert_active();
         let event: Event = self.internal_get_event(&event_id);
         assert_eq!(event.status, EventStatus::Calculated, "Distribution is not available");
 
-        let keys = self.payouts.keys_as_vector();
-
         let mut accounts: Vec<MultisenderPayout> = [].to_vec();
         let mut total: Balance = 0;
 
-        for index in from_index..std::cmp::min(from_index + limit, keys.len()) {
-            let mut payout: Payout = self.payouts.get(&(event_id, index)).unwrap();
-            if payout.status == PayoutStatus::Pending {
-                accounts.push({
-                    MultisenderPayout {
-                        account_id: payout.account_id.to_owned(),
-                        token_id: None,
-                        amount: payout.amount,
-                    }
-                });
-                total += payout.amount.0;
-                payout.status = PayoutStatus::Complete;
-                self.payouts.insert(&(event_id, index), &payout);
+        let from_index_value = from_index.unwrap_or_default();
+        let limit_value = limit.unwrap_or_else(|| std::cmp::min(event.rewards.len(), event.participants.len()));
+
+        for index in from_index_value..from_index_value + limit_value {
+            if let Some(mut payout) = self.payouts.get(&(event_id, index)) {
+                if payout.status == PayoutStatus::Pending {
+                    accounts.push({
+                        MultisenderPayout {
+                            account_id: payout.account_id.to_owned(),
+                            token_id: None,
+                            amount: payout.amount,
+                        }
+                    });
+                    total += payout.amount.0;
+                    payout.status = PayoutStatus::Complete;
+                    self.payouts.insert(&(event_id, index), &payout);
+                }
             }
         }
 
@@ -273,5 +275,21 @@ impl Giveaway {
 
         let unspent_gas = env::prepaid_gas() - BASE_PAYOUT_PREPARATION_GAS;
         ext_multisender::multisend_attached_tokens(accounts, self.multisender_contract.to_owned(), total, unspent_gas)
+    }
+
+    pub fn close_event(&mut self, event_id: u64) {
+        self.assert_active();
+        let mut event: Event = self.internal_get_event(&event_id);
+        assert_eq!(event.status, EventStatus::Calculated, "Method is not available");
+
+        let rewards_num = std::cmp::min(event.rewards.len(), event.participants.len());
+        for index in 0..rewards_num {
+            let payout = self.payouts.get(&(event_id, index)).expect("ERR_NO_PAYOUT");
+            assert_eq!(payout.status, PayoutStatus::Complete, "Payouts still pending");
+        }
+
+        log!("All payouts distributed");
+        event.status = EventStatus::Distributed;
+        self.events.insert(&event_id, &event);
     }
 }

@@ -130,7 +130,7 @@ impl Giveaway {
       (from_index..std::cmp::min(from_index + limit, self.events.len())).map(|index| (index, self.internal_get_event_output(&index))).collect()
    }
 
-   pub fn get_event_output(&self, event_id: u64) -> Option<EventOutput> {
+   pub fn get_event(&self, event_id: u64) -> Option<EventOutput> {
       self.internal_get_event_output(&event_id)
    }
 }

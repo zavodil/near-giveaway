@@ -5,6 +5,7 @@ const {BN} = require('bn.js');
 const fs = require('fs');
 const fetch = require("node-fetch");
 const config = require("./config");
+const helper = require("./helper");
 
 
 module.exports = {
@@ -70,6 +71,14 @@ module.exports = {
                     } else {
                         try {
                             const json = JSON.parse(response);
+                            if (json.hasOwnProperty('error')) {
+                                const error = JSON.parse(json.error);
+                                if(options.log_errors && error.hasOwnProperty('transaction_outcome')) {
+                                    console.log("Call error:" + helper.GetTxUrl(error.transaction_outcome.id));
+                                }
+                                return error;
+                            }
+
                             try {
                                 if (options.return_value)
                                     return Buffer.from( json.status.SuccessValue, 'base64').toString();

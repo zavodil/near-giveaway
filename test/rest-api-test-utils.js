@@ -55,10 +55,15 @@ contract.prototype.accountNearBalance = async function (account_id, delay) {
 
 contract.prototype.call = async function (method, params, options) {
     options.attached_gas = options.gas || config.GAS;
-    options.attached_tokens = options.tokens || 0;
+    if(options.hasOwnProperty("deposit_near")){
+        options.attached_tokens = utils.ConvertToNear(options.deposit_near);
+    } else {
+        options.attached_tokens = options.deposit || 0;
+    }
     options.private_key = options.private_key || await utils.getPrivateKey(options.account_id);
     options.log_errors = options.log_errors || false;
     options.return_value = options.return_value || false;
+
 
     const body = {
         ...options,
