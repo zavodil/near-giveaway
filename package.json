@@ -22,7 +22,7 @@
     "dev:clear": "rm -r neardev",
     "test": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js --useStderr --verbose false",
     "test:1": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js -t 'Create Event' --useStderr --verbose false",
-    "test:2": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js -t 'Close Event' --useStderr --verbose false"
+    "test:2": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js -t '10 participant, 1 reward, 10 times' --useStderr --silent false --verbose"
   },
   "devDependencies": {
     "@babel/core": "~7.12.3",

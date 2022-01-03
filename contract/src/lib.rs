@@ -23,9 +23,19 @@ const MIN_DEPOSIT_AMOUNT: u128 = 10_000_000_000_000_000_000_000;
 const MAX_DESCRIPTION_LENGTH: usize = 280;
 const MAX_TITLE_LENGTH: usize = 128;
 
+const NO_DEPOSIT: Balance = 0;
 const SERVICE_COMMISSION: Balance = 10_000_000_000_000_000_000;
-
 const BASE_PAYOUT_PREPARATION_GAS: Gas = Gas(25_000_000_000_000);
+const GAS_FOR_AFTER_MULTISEND: Gas = Gas(25_000_000_000_000);
+
+#[ext_contract(ext_self)]
+pub trait ExtContract {
+    fn after_multisend_attached_tokens(
+        &mut self,
+        event_id: u64,
+        accounts: Vec<MultisenderPayout>,
+    ) -> bool;
+}
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -34,7 +44,7 @@ pub struct Giveaway {
     active: bool,
     next_event_id: u64,
     events: UnorderedMap<EventId, Event>,
-    payouts: UnorderedMap<(EventId, PayoutIndex), Payout>,
+    payouts: UnorderedMap<EventId, Vec<Payout>>,
     /// Whitelisted tokens. None for native NEAR
     whitelisted_tokens: LookupSet<TokenId>,
     /// Contract of multisender app
@@ -193,6 +203,7 @@ impl Giveaway {
         let max_rewards: PayoutIndex = event.rewards.len() as PayoutIndex;
         let mut index = 0;
         let seed = near_sdk::env::random_seed();
+        let mut payouts = self.internal_get_payouts(&event_id);
         for reward in event.rewards.to_vec() {
             let mut winner_account_id: Option<AccountId> = None;
 
@@ -217,13 +228,13 @@ impl Giveaway {
             if let Some(winner_account_id_value) = winner_account_id {
                 winners.push(winner_account_id_value.clone());
 
-                self.payouts.insert(&(event_id, payouts_number),
-                                    &Payout {
-                                        account_id: winner_account_id_value.clone(),
-                                        amount: reward,
-                                        token_id: event.rewards_token_id.to_owned(),
-                                        status: PayoutStatus::Pending,
-                                    });
+                payouts.push(Payout {
+                    account_id: winner_account_id_value.clone(),
+                    amount: reward,
+                    token_id: event.rewards_token_id.to_owned(),
+                    status: PayoutStatus::Pending,
+                });
+
                 payouts_number += 1;
 
                 log!("@{} won reward of {} yNEAR", winner_account_id_value, reward.0);
@@ -239,6 +250,8 @@ impl Giveaway {
                 log!("Reset index");
             }
         }
+
+        self.payouts.insert(&event_id, &payouts);
     }
 
     pub fn distribute_payouts(&mut self, event_id: u64, from_index: Option<u64>, limit: Option<u64>) -> Promise {
@@ -249,11 +262,14 @@ impl Giveaway {
         let mut accounts: Vec<MultisenderPayout> = [].to_vec();
         let mut total: Balance = 0;
 
-        let from_index_value = from_index.unwrap_or_default();
-        let limit_value = limit.unwrap_or_else(|| std::cmp::min(event.rewards.len(), event.participants.len()));
+        let from_index = from_index.unwrap_or_default();
+        let limit = limit.unwrap_or_else(|| std::cmp::min(event.rewards.len(), event.participants.len()));
 
-        for index in from_index_value..from_index_value + limit_value {
-            if let Some(mut payout) = self.payouts.get(&(event_id, index)) {
+        let mut payouts = self.internal_get_payouts(&event_id);
+
+        for index  in from_index..from_index + limit {
+            let index = index as usize;
+            if let Some(payout) = payouts.get(index) {
                 if payout.status == PayoutStatus::Pending {
                     accounts.push({
                         MultisenderPayout {
@@ -263,16 +279,29 @@ impl Giveaway {
                         }
                     });
                     total += payout.amount.0;
-                    payout.status = PayoutStatus::Complete;
-                    self.payouts.insert(&(event_id, index), &payout);
+                    payouts[index].status = PayoutStatus::Complete;
                 }
             }
         }
 
+        self.payouts.insert(&event_id, &payouts);
+
         log!("Distributing rewards: {}", total);
 
-        let unspent_gas = env::prepaid_gas() - BASE_PAYOUT_PREPARATION_GAS;
-        ext_multisender::multisend_attached_tokens(accounts, self.multisender_contract.to_owned(), total, unspent_gas)
+        let unspent_gas = env::prepaid_gas() - BASE_PAYOUT_PREPARATION_GAS - GAS_FOR_AFTER_MULTISEND;
+
+        ext_multisender::multisend_attached_tokens(
+            accounts.clone(),
+            self.multisender_contract.to_owned(),
+            total,
+            unspent_gas)
+       .then(ext_self::after_multisend_attached_tokens(
+           event_id,
+           accounts,
+           env::current_account_id(),
+           NO_DEPOSIT,
+           GAS_FOR_AFTER_MULTISEND,
+       ))
     }
 
     pub fn close_event(&mut self, event_id: u64) {
@@ -280,10 +309,12 @@ impl Giveaway {
         let mut event: Event = self.internal_get_event(&event_id);
         assert_eq!(event.status, EventStatus::Calculated, "Method is not available");
 
+        let payouts = self.internal_get_payouts(&event_id);
+
         let rewards_num = std::cmp::min(event.rewards.len(), event.participants.len());
         for index in 0..rewards_num {
-            let payout = self.payouts.get(&(event_id, index)).expect("ERR_NO_PAYOUT");
-            assert_eq!(payout.status, PayoutStatus::Complete, "Payouts still pending");
+            let index = index as usize;
+            assert_eq!(payouts[index].status, PayoutStatus::Complete, "Payouts still pending");
         }
 
         log!("All payouts distributed");

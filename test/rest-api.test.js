@@ -30,7 +30,7 @@ describe("Contract set", () => {
         await near.call("new", {
             owner_id: "zavodil.testnet",
             multisender_contract: "dev-1611689128537-1966413"
-        }, {account_id: contract_id});
+        }, {account_id: contract_id, log_errors: false});
     });
 
     test('Accounts has enough funds', async () => {
@@ -65,7 +65,7 @@ describe("Create events", () => {
         }, {
             account_id: admin,
             deposit_near: reward_1 + reward_2 + service_fee,
-            return_value: true
+            return_value_int: true
         });
         expect(event_id).toBe(current_event_id);
         const next_event_id = await near.view("get_next_event_id");
@@ -93,7 +93,7 @@ describe("Create events", () => {
         }, {
             account_id: admin,
             deposit_near: reward_3 + service_fee,
-            return_value: true
+            return_value_int: true
         });
 
         const finalize_event_1 = await near.call("finalize_event", {
@@ -128,7 +128,7 @@ describe("Create events", () => {
         }, {
             account_id: admin,
             deposit_near: reward_3 + service_fee,
-            return_value: true
+            return_value_int: true
         });
 
         const event_0 = await near.view("get_event",
@@ -198,7 +198,7 @@ describe("Create events", () => {
         }, {
             account_id: admin,
             deposit_near: reward_1 + reward_2 + service_fee,
-            return_value: true
+            return_value_int: true
         });
 
         // finalize, check reward
@@ -251,7 +251,7 @@ describe("Create events", () => {
         }, {
             account_id: admin,
             deposit_near: reward_1 + reward_2 + service_fee,
-            return_value: true
+            return_value_int: true
         });
 
         // finalize, check reward
@@ -303,7 +303,7 @@ describe("Create events", () => {
         }, {
             account_id: admin,
             deposit_near: reward_1 + reward_2 + service_fee,
-            return_value: true
+            return_value_int: true
         });
 
         // finalize, check reward
@@ -325,6 +325,47 @@ describe("Create events", () => {
             [reward_1],
             [alice_wallet_balance_2 - alice_wallet_balance_1]))
             .toBeTruthy();
+    });
+
+    test("10 participant, 1 reward, 10 times", async () => {
+        let participants = Array.from({ length: 10 }, (_, i) => i+1).map(index => `account_${index}.testnet`);
+        const test = async () => {
+            const event_id = await near.call("add_event", {
+                event_input: {
+                    rewards: [
+                        utils.ConvertToNear(reward_1)
+                    ],
+                    rewards_token_id: null,
+                    participants,
+                    allow_duplicate_participants: false,
+                    add_participants_start_timestamp: start_timestamp,
+                    add_participants_end_timestamp: end_timestamp,
+                    event_timestamp: event_timestamp,
+                    title: "Test",
+                    description: "Test text"
+                }
+            }, {
+                account_id: admin,
+                deposit_near: reward_1 + reward_2 + service_fee,
+                return_value_int: true
+            });
+
+            const finalize_event = await near.call("finalize_event", {event_id}, {account_id: admin});
+            expect(finalize_event.type).not.toBe('FunctionCallError');
+
+            let payouts = await near.view("get_payouts", {event_id}, {return_json: true});
+            // console.log(`Winner: ${payouts[0].account_id}`);
+            return payouts[0].account_id;
+        }
+
+        let winners = [];
+        let iterations = 10;
+        for(let x=0; x<iterations; x++) {
+            let winner = await test();
+            if (!winners.includes(winner))
+                winners.push(winner);
+        }
+        expect(winners.length).toBeGreaterThan(iterations/2)
     });
 });
 
