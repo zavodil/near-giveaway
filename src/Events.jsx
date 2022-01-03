@@ -56,8 +56,8 @@ const Events = ({
           event_input: {
             title,
             description,
-            rewards,
-            participants,
+            rewards: rewards.map((r) => r.id),
+            participants: participants.map((p) => p.id),
             allow_duplicate_participants: allowDuplicates,
             event_timestamp: toNano(eventDate),
             add_participants_start_timestamp: toNano(addParticipantsStartDate),

@@ -33,26 +33,29 @@
     "near-cli": "~2.1.1",
     "nodemon": "~2.0.3",
     "parcel-bundler": "~1.12.4",
-    "shelljs": "~0.8.4",
     "postcss": "^7",
+    "shelljs": "~0.8.4",
     "web-vitals": "^1.0.1"
   },
   "dependencies": {
-    "cross-env": "^7.0.3",
-    "node-fetch": "^2.6.1",
-    "tailwindcss": "npm:@tailwindcss/postcss7-compat",
     "@headlessui/react": "^1.4.1",
     "@heroicons/react": "^1.0.5",
+    "big.js": "^5.2.2",
+    "cross-env": "^7.0.3",
     "moment": "^2.29.1",
     "near-api-js": "~0.43.1",
+    "node-fetch": "^2.6.1",
     "react": "^17.0.2",
+    "react-datetime-picker": "^3.4.3",
+    "react-dnd": "^14.0.5",
+    "react-dnd-html5-backend": "^14.1.0",
     "react-dom": "^17.0.2",
     "react-scripts": "4.0.3",
+    "react-tag-input": "^6.7.3",
     "react-test-renderer": "~17.0.1",
     "react-use": "^17.3.1",
-    "react-datetime-picker": "^3.4.3",
     "regenerator-runtime": "~0.13.5",
-    "big.js": "^5.2.2"
+    "tailwindcss": "npm:@tailwindcss/postcss7-compat"
   },
   "eslintConfig": {
     "extends": [

@@ -93,14 +93,12 @@ const EventDetails = ({
             />
           </svg>
           <p className="flex-grow">{event.description}</p>
-          {isOwner && (
-            <button
-              className="disabled:opacity-50 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-none"
-              onClick={finalizeEvent}
-            >
-              Finalize Event
-            </button>
-          )}
+          <button
+            className="disabled:opacity-50 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-none"
+            onClick={finalizeEvent}
+          >
+            Finalize Event
+          </button>
         </div>
         <div className="text-md font-medium text-black text flex flex-row items-center">
           <svg
@@ -146,7 +144,6 @@ const EventDetails = ({
         <div className="text-sm font-medium text-black text flex flex-row items-center">
           {event && event.participants && event.participants.length > 0 && (
             <div>
-              Participants:
               {event.participants.map((p, index) => {
                 return <Participant key={index} participant={p} />;
               })}
@@ -158,7 +155,7 @@ const EventDetails = ({
   );
 };
 
-const Participant = ({ candidate: participant }) => {
+const Participant = ({ participant }) => {
   return <div className="flex">{participant}</div>;
 };
 

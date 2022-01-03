@@ -3,12 +3,15 @@ import { Switch } from "@headlessui/react";
 import { Fragment, useState } from "react";
 import TextField from "./TextField";
 import moment from "moment";
+import { WithContext as ReactTags } from "react-tag-input";
 
 const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [rewards, setRewards] = useState(["1"]);
-  const [participants, setParticipants] = useState([]);
+  const [rewards, setRewards] = useState([{ id: "1", text: "1" }]);
+  const [participants, setParticipants] = useState([
+    { id: "lkskrnk.testnet", text: "lkskrnk.testnet" },
+  ]);
   const [allowDuplicates, setAllowDuplicates] = useState(false);
   const [eventDate, setEventDate] = useState(
     moment().add(8, "days").endOf("day").toDate()
@@ -19,6 +22,39 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
   const [addParticipantsEndDate, setAddParticipantsEndDate] = useState(
     moment().add(7, "days").endOf("day").toDate()
   );
+
+  const KeyCodes = {
+    comma: 188,
+    enter: 13,
+    space: 32,
+  };
+
+  const delimiters = [KeyCodes.comma, KeyCodes.enter, KeyCodes.space];
+
+  const handleDeleteReward = (i) => {
+    setRewards(rewards.filter((r, index) => index !== i));
+  };
+
+  const handleAddReward = (r) => {
+    //TODO Add reward validation
+    setRewards([...rewards, r]);
+  };
+
+  const handleDeleteParticipant = (i) => {
+    setParticipants(participants.filter((p, index) => index !== i));
+  };
+
+  const handleAddParticipant = (p) => {
+    //TODO Add address validation
+    setParticipants([...participants, p]);
+  };
+
+  const handleDragParticipant = (tag, currPos, newPos) => {
+    const newTags = participants.slice();
+    newTags.splice(currPos, 1);
+    newTags.splice(newPos, 0, tag);
+    setParticipants(newTags);
+  };
 
   return (
     <>
@@ -123,6 +159,39 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
                       </Switch>
                     </div>
                   </Switch.Group>
+                </div>
+
+                <div className={`mt-4`}>
+                  <label className="mb-2" htmlFor="rewards">
+                    Rewards:
+                  </label>
+                  <ReactTags
+                    tags={rewards}
+                    delimiters={delimiters}
+                    handleDelete={handleDeleteReward}
+                    handleAddition={handleAddReward}
+                    inputFieldPosition="top"
+                    allowUnique={false}
+                    placeholder="Insert rewards"
+                    allowDragDrop={false}
+                  />
+                </div>
+
+                <div className={`mt-4`}>
+                  <label className="mb-2" htmlFor="participants">
+                    Participants:
+                  </label>
+                  <ReactTags
+                    tags={participants}
+                    delimiters={delimiters}
+                    handleDelete={handleDeleteParticipant}
+                    handleAddition={handleAddParticipant}
+                    handleDrag={handleDragParticipant}
+                    inputFieldPosition="top"
+                    allowUnique={!allowDuplicates}
+                    placeholder="Insert participants"
+                    allowDragDrop={true}
+                  />
                 </div>
 
                 <div className="mt-4 flex justify-between">
