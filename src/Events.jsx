@@ -50,6 +50,11 @@ const Events = ({
     participants
   ) => {
     onLoading(true);
+    //TODO should we add comission to the total sum?
+    const totalRewards = rewards
+      .map((r) => r.id)
+      .reduce((a, b) => parseInt(a) + parseInt(b));
+    console.log(totalRewards);
     contract
       .add_event(
         {
@@ -65,7 +70,7 @@ const Events = ({
           },
         },
         BOATLOAD_OF_GAS,
-        Big(1)
+        Big(totalRewards)
           .times(10 ** 24)
           .toFixed()
       )
