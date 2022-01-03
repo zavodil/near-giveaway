@@ -56,6 +56,19 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
     setParticipants(newTags);
   };
 
+  const canAddEvent = () => {
+    return (
+      title &&
+      title.length > 0 &&
+      description &&
+      description.length > 0 &&
+      rewards.length > 0 &&
+      participants.length > 0 &&
+      eventDate &&
+      addParticipantsStartDate
+    );
+  };
+
   return (
     <>
       <Transition appear show={isOpen} as={Fragment}>
@@ -204,19 +217,22 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
                   </button>
                   <button
                     type="button"
-                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-blue-900 bg-blue-100 border border-transparent rounded-md hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
-                    onClick={() =>
-                      onRegister(
-                        title,
-                        description,
-                        eventDate,
-                        addParticipantsEndDate,
-                        addParticipantsStartDate,
-                        allowDuplicates,
-                        rewards,
-                        participants
-                      )
-                    }
+                    className="inline-flex justify-center px-4 py-2 text-sm font-medium text-blue-900 bg-blue-100 border border-transparent rounded-md hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 disabled:opacity-30"
+                    onClick={() => {
+                      if (canAddEvent) {
+                        onRegister(
+                          title,
+                          description,
+                          eventDate,
+                          addParticipantsEndDate,
+                          addParticipantsStartDate,
+                          allowDuplicates,
+                          rewards,
+                          participants
+                        );
+                      }
+                    }}
+                    disabled={!canAddEvent()}
                   >
                     Register
                   </button>
