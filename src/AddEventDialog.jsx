@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import TextField from "./TextField";
 import moment from "moment";
 import { WithContext as ReactTags } from "react-tag-input";
+import { delimiters } from "./utils";
 
 const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
   const [title, setTitle] = useState("");
@@ -22,14 +23,6 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
   const [addParticipantsEndDate, setAddParticipantsEndDate] = useState(
     moment().add(7, "days").endOf("day").toDate()
   );
-
-  const KeyCodes = {
-    comma: 188,
-    enter: 13,
-    space: 32,
-  };
-
-  const delimiters = [KeyCodes.comma, KeyCodes.enter, KeyCodes.space];
 
   const handleDeleteReward = (i) => {
     setRewards(rewards.filter((r, index) => index !== i));

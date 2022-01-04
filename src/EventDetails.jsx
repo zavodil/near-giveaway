@@ -2,6 +2,9 @@ import { Fragment, useState, useEffect } from "react";
 import { Transition } from "@headlessui/react";
 import { useTimeoutFn } from "react-use";
 import { toDate, formatDate } from "./utils";
+import { WithContext as ReactTags } from "react-tag-input";
+import { delimiters } from "./utils";
+import { BOATLOAD_OF_GAS } from "./utils";
 
 const EventDetails = ({
   currentEvent,
@@ -16,6 +19,8 @@ const EventDetails = ({
   const [isShowing, setIsShowing] = useState(false);
   const [closeButtonColor, setCloseButtonColor] = useState("#000");
   const [event, setEvent] = useState(currentEvent);
+  const [shouldReloadEvent, setShouldReloadEvent] = useState(false);
+  const [newParticipants, setNewParticipants] = useState([]);
 
   let [, , resetIsShowing] = useTimeoutFn(() => setIsShowing(true), 100);
   useEffect(() => {
@@ -38,6 +43,50 @@ const EventDetails = ({
   const addParticipantsEndDate = toDate(event.add_participants_end_timestamp);
 
   const finalizeEvent = () => {};
+
+  const saveNewParticipants = () => {
+    onLoading(true);
+    contract
+      .insert_participants(
+        {
+          event_id: event.id, // TODO event_id is missing
+          participants: newParticipants.map((p) => p.id),
+        },
+        BOATLOAD_OF_GAS
+      )
+      .then(
+        () => {
+          setShouldReloadEvent(true);
+          onLoading(false);
+        },
+        (err) => {
+          onLoading(false);
+          onError(`${err && err.kind ? err.kind["ExecutionError"] : err}`);
+        }
+      );
+  };
+
+  const handleDeleteParticipant = (i) => {
+    setNewParticipants(newParticipants.filter((p, index) => index !== i));
+  };
+
+  const handleAddParticipant = (p) => {
+    //TODO Add address validation
+    setNewParticipants([...newParticipants, p]);
+  };
+
+  const handleDragParticipant = (tag, currPos, newPos) => {
+    const newTags = newParticipants.slice();
+    newTags.splice(currPos, 1);
+    newTags.splice(newPos, 0, tag);
+    setNewParticipants(newTags);
+  };
+
+  useEffect(() => {
+    if (shouldReloadEvent) {
+      // TODO reload event
+    }
+  }, [contract, shouldReloadEvent]);
 
   return (
     <Transition
@@ -115,10 +164,10 @@ const EventDetails = ({
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <p>Draw date: {formatDate(eventDate)}</p>
+          <p className="flex-grow">Draw date: {formatDate(eventDate)}</p>
           {finalizedDate && <p>Finalized date: {formatDate(finalizedDate)}</p>}
         </div>
-        <div className="text-md font-medium text-black text flex flex-row items-center">
+        <div className="text-md font-medium text-black text flex flex-row items-center mt-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-6 w-6 mr-1"
@@ -136,12 +185,30 @@ const EventDetails = ({
           Accepting participants: {formatDate(addParticipantsStartDate)} -{" "}
           {formatDate(addParticipantsEndDate)}
         </div>
+        <div className="text-sm font-medium text-black text flex flex-row items-center mt-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-6 w-6 mr-1"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          Rewards:
+          {event.rewards && event.rewards.map((r) => <span>{r}</span>)}
+        </div>
         <div className="text-xl font-medium text-black text-center">
           {event.participants.length > 0
             ? "Participants:"
             : "No participants yet, add participants before the end date."}
         </div>
-        <div className="text-sm font-medium text-black text flex flex-row items-center">
+        <div className="text-md font-medium text-black text flex flex-row items-center">
           {event && event.participants && event.participants.length > 0 && (
             <div>
               {event.participants.map((p, index) => {
@@ -150,13 +217,42 @@ const EventDetails = ({
             </div>
           )}
         </div>
+        {isOwner && (
+          <>
+            <div className="text-xl font-medium text-black text-center">
+              Add participants:
+            </div>
+            <div className={`mt-4 flex mr-4`}>
+              <div className="flex-auto">
+                <ReactTags
+                  tags={newParticipants}
+                  delimiters={delimiters}
+                  handleDelete={handleDeleteParticipant}
+                  handleAddition={handleAddParticipant}
+                  handleDrag={handleDragParticipant}
+                  inputFieldPosition="top"
+                  allowUnique={!event.allowDuplicates}
+                  placeholder="Insert participants"
+                  allowDragDrop={true}
+                  inline={true}
+                />
+              </div>
+              <button
+                className="disabled:opacity-50 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-none h-12"
+                onClick={saveNewParticipants}
+              >
+                Save
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </Transition>
   );
 };
 
 const Participant = ({ participant }) => {
-  return <div className="flex">{participant}</div>;
+  return <div className="flex text-md">{participant}</div>;
 };
 
 export default EventDetails;

@@ -4,11 +4,8 @@ import AddEventDialog from "./AddEventDialog";
 import EventCard from "./EventCard";
 import EventDetails from "./EventDetails";
 import moment from "moment";
+import { BOATLOAD_OF_GAS } from "./utils";
 import Big from "big.js";
-
-const BOATLOAD_OF_GAS = Big(3)
-  .times(10 ** 13)
-  .toFixed();
 
 const Events = ({
   contract,
@@ -54,7 +51,6 @@ const Events = ({
     const totalRewards = rewards
       .map((r) => r.id)
       .reduce((a, b) => parseInt(a) + parseInt(b));
-    console.log(totalRewards);
     contract
       .add_event(
         {
