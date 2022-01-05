@@ -1,0 +1,23 @@
+{
+  "files": {
+    "main.css": "/near-giveaway/static/css/main.b6e3e7ae.chunk.css",
+    "main.js": "/near-giveaway/static/js/main.abebd419.chunk.js",
+    "main.js.map": "/near-giveaway/static/js/main.abebd419.chunk.js.map",
+    "runtime-main.js": "/near-giveaway/static/js/runtime-main.13e7fe51.js",
+    "runtime-main.js.map": "/near-giveaway/static/js/runtime-main.13e7fe51.js.map",
+    "static/css/2.4f9b77db.chunk.css": "/near-giveaway/static/css/2.4f9b77db.chunk.css",
+    "static/js/2.8f118adb.chunk.js": "/near-giveaway/static/js/2.8f118adb.chunk.js",
+    "static/js/2.8f118adb.chunk.js.map": "/near-giveaway/static/js/2.8f118adb.chunk.js.map",
+    "index.html": "/near-giveaway/index.html",
+    "static/css/2.4f9b77db.chunk.css.map": "/near-giveaway/static/css/2.4f9b77db.chunk.css.map",
+    "static/css/main.b6e3e7ae.chunk.css.map": "/near-giveaway/static/css/main.b6e3e7ae.chunk.css.map",
+    "static/js/2.8f118adb.chunk.js.LICENSE.txt": "/near-giveaway/static/js/2.8f118adb.chunk.js.LICENSE.txt"
+  },
+  "entrypoints": [
+    "static/js/runtime-main.13e7fe51.js",
+    "static/css/2.4f9b77db.chunk.css",
+    "static/js/2.8f118adb.chunk.js",
+    "static/css/main.b6e3e7ae.chunk.css",
+    "static/js/main.abebd419.chunk.js"
+  ]
+}
