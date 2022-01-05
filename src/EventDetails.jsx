@@ -5,6 +5,7 @@ import { toDate, formatDate } from "./utils";
 import { WithContext as ReactTags } from "react-tag-input";
 import { delimiters } from "./utils";
 import { BOATLOAD_OF_GAS } from "./utils";
+import moment from "moment";
 
 const EventDetails = ({
   currentEvent,
@@ -42,28 +43,51 @@ const EventDetails = ({
   );
   const addParticipantsEndDate = toDate(event.add_participants_end_timestamp);
 
-  const finalizeEvent = () => {};
+  const finalizeEvent = () => {
+    if (!finalizedDate && eventDate.isBefore(moment())) {
+      onLoading(true);
+      contract
+        .finalize_event(
+          {
+            event_id: event.id,
+          },
+          BOATLOAD_OF_GAS
+        )
+        .then(
+          () => {
+            setShouldReloadEvent(true);
+            onLoading(false);
+          },
+          (err) => {
+            onLoading(false);
+            onError(`${err && err.kind ? err.kind["ExecutionError"] : err}`);
+          }
+        );
+    }
+  };
 
   const saveNewParticipants = () => {
-    onLoading(true);
-    contract
-      .insert_participants(
-        {
-          event_id: event.id,
-          participants: newParticipants.map((p) => p.id),
-        },
-        BOATLOAD_OF_GAS
-      )
-      .then(
-        () => {
-          setShouldReloadEvent(true);
-          onLoading(false);
-        },
-        (err) => {
-          onLoading(false);
-          onError(`${err && err.kind ? err.kind["ExecutionError"] : err}`);
-        }
-      );
+    if (newParticipants.length > 0) {
+      onLoading(true);
+      contract
+        .insert_participants(
+          {
+            event_id: event.id,
+            participants: newParticipants.map((p) => p.id),
+          },
+          BOATLOAD_OF_GAS
+        )
+        .then(
+          () => {
+            setShouldReloadEvent(true);
+            onLoading(false);
+          },
+          (err) => {
+            onLoading(false);
+            onError(`${err && err.kind ? err.kind["ExecutionError"] : err}`);
+          }
+        );
+    }
   };
 
   const handleDeleteParticipant = (i) => {
@@ -83,10 +107,29 @@ const EventDetails = ({
   };
 
   useEffect(() => {
-    if (shouldReloadEvent) {
-      // TODO reload event
+    if (shouldReloadEvent && onLoading && onError) {
+      const eventId = event.id;
+      contract
+        .get_event(
+          {
+            event_id: eventId,
+          },
+          BOATLOAD_OF_GAS
+        )
+        .then(
+          (event) => {
+            setEvent({ ...event, id: eventId });
+            setShouldReloadEvent(false);
+            onLoading(false);
+          },
+          (err) => {
+            setShouldReloadEvent(false);
+            onLoading(false);
+            onError(`${err && err.kind ? err.kind["ExecutionError"] : err}`);
+          }
+        );
     }
-  }, [contract, shouldReloadEvent]);
+  }, [contract, event.id, shouldReloadEvent, onLoading, onError]);
 
   return (
     <Transition
@@ -240,6 +283,7 @@ const EventDetails = ({
               </div>
               <button
                 className="disabled:opacity-50 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-none h-12"
+                disabled={newParticipants.length === 0}
                 onClick={saveNewParticipants}
               >
                 Save
