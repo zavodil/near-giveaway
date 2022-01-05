@@ -1,8 +1,13 @@
 use crate::*;
 
 impl Giveaway {
+   pub fn internal_add_service_fee(&mut self, token_id: &Option<TokenId>, fee: &Balance) {
+      let balance = self.total_service_fee.get(token_id).unwrap_or_default();
+      self.total_service_fee.insert(token_id, &(balance + fee));
+   }
+
    pub fn assert_whitelisted_token(&self, token_id: &Option<TokenId>) {
-      if let Some (token_id_value) = token_id {
+      if let Some(token_id_value) = token_id {
          assert!(self.is_whitelisted_token(token_id_value), "ERR_TOKEN_NOT_ALLOWED");
       }
    }
@@ -22,11 +27,15 @@ impl Giveaway {
 
 #[near_bindgen]
 impl Giveaway {
-   pub fn set_active(&mut self, active: bool){
+   pub fn set_active(&mut self, active: bool) {
       self.active = active;
    }
 
    pub fn get_next_event_id(&self) -> u64 {
       self.next_event_id
+   }
+
+   pub fn get_total_service_fee(&self, token_id: Option<TokenId>) -> Option<Balance> {
+      self.total_service_fee.get(&token_id)
    }
 }

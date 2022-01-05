@@ -49,6 +49,7 @@ pub struct Giveaway {
     whitelisted_tokens: LookupSet<TokenId>,
     /// Contract of multisender app
     multisender_contract: AccountId,
+    total_service_fee: UnorderedMap<Option<TokenId>, Balance>
 }
 
 #[derive(BorshStorageKey, BorshSerialize)]
@@ -58,6 +59,7 @@ pub(crate) enum StorageKey {
     EventRewards { event_id: u64 },
     EventParticipants { event_id: u64 },
     WhitelistedTokens,
+    TotalServiceFee
 }
 
 #[near_bindgen]
@@ -73,6 +75,7 @@ impl Giveaway {
             payouts: UnorderedMap::new(StorageKey::Payouts),
             whitelisted_tokens: LookupSet::new(StorageKey::WhitelistedTokens),
             multisender_contract: multisender_contract.unwrap_or_else(|| AccountId::new_unchecked("multisender.app.near".to_string())),
+            total_service_fee: UnorderedMap::new(StorageKey::TotalServiceFee),
         }
     }
 
@@ -111,6 +114,7 @@ impl Giveaway {
         }
 
         let payment: Balance = total + SERVICE_COMMISSION;
+        self.internal_add_service_fee(&event_input.rewards_token_id, &SERVICE_COMMISSION);
 
         assert!(
             payment <= tokens,
