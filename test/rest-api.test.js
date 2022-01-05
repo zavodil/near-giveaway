@@ -354,7 +354,7 @@ describe("Create events", () => {
             expect(finalize_event.type).not.toBe('FunctionCallError');
 
             let payouts = await near.view("get_payouts", {event_id}, {return_json: true});
-            // console.log(`Winner: ${payouts[0].account_id}`);
+            console.log(`Winner: ${payouts[0].account_id}`);
             return payouts[0].account_id;
         }
 
@@ -365,7 +365,7 @@ describe("Create events", () => {
             if (!winners.includes(winner))
                 winners.push(winner);
         }
-        expect(winners.length).toBeGreaterThan(iterations/2)
+        expect(winners.length).toBeGreaterThan(iterations/3)
     });
 });
 
