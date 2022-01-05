@@ -111,7 +111,7 @@ const Events = ({
                 return (
                   <EventCard
                     key={index}
-                    currentEvent={events[key]}
+                    currentEvent={{ ...events[key], id: parseInt(key) }}
                     index={index}
                     contract={contract}
                     currentUser={currentUser}
