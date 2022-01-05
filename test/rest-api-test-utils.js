@@ -16,8 +16,8 @@ contract.prototype.deploy = async function (contractName) {
 };
 
 contract.prototype.view = async function (method, params, options) {
-    if (params === undefined)
-        params = {};
+    params = params || {};
+    options = options || {};
 
     const body = {
         method: method,
@@ -54,11 +54,23 @@ contract.prototype.accountNearBalance = async function (account_id, delay) {
 };
 
 contract.prototype.call = async function (method, params, options) {
+    params = params || {};
+    if (!options.hasOwnProperty("account_id")) {
+        throw new Error ("Account_id was not provided for CALL request")
+    }
+
     options.attached_gas = options.gas || config.GAS;
-    options.attached_tokens = options.tokens || 0;
+    if(options.hasOwnProperty("deposit_near")){
+        options.attached_tokens = utils.ConvertToNear(options.deposit_near);
+    } else {
+        options.attached_tokens = options.deposit || 0;
+    }
     options.private_key = options.private_key || await utils.getPrivateKey(options.account_id);
-    options.log_errors = options.log_errors || false;
+    options.log_errors = typeof (options.log_errors) ? options.log_errors : true;
     options.return_value = options.return_value || false;
+    options.return_value_int = options.return_value_int || false;
+    options.return_value_float = options.return_value_float || false;
+
 
     const body = {
         ...options,

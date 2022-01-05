@@ -118,19 +118,23 @@ impl Giveaway {
 
 #[near_bindgen]
 impl Giveaway {
-   pub fn get_events_to_finalize(&self, from_index: u64, limit: u64) -> HashMap<u64, Option<EventOutput>> {
+   pub fn get_events_to_finalize(&self, from_index: u64, limit: u64) -> Vec<(u64, Option<EventOutput>)> {
       let current_timestamp = env::block_timestamp();
       (from_index..std::cmp::min(from_index + limit, self.events.len())).filter(|index| {
          let event = self.events.get(&index.clone()).unwrap();
          event.status == EventStatus::Pending && current_timestamp >= event.event_timestamp.into()
-      }).map(|index| (index, self.internal_get_event_output(&index))).collect()
+      })
+         .map(|index| (index, self.internal_get_event_output(&index)))
+         .collect()
    }
 
-   pub fn get_events(&self, from_index: u64, limit: u64) -> HashMap<u64, Option<EventOutput>> {
-      (from_index..std::cmp::min(from_index + limit, self.events.len())).map(|index| (index, self.internal_get_event_output(&index))).collect()
+   pub fn get_events(&self, from_index: u64, limit: u64) -> Vec<(u64, Option<EventOutput>)> {
+      (from_index..std::cmp::min(from_index + limit, self.events.len()))
+         .map(|index| (index, self.internal_get_event_output(&index)))
+         .collect()
    }
 
-   pub fn get_event_output(&self, event_id: u64) -> Option<EventOutput> {
+   pub fn get_event(&self, event_id: u64) -> Option<EventOutput> {
       self.internal_get_event_output(&event_id)
    }
 }

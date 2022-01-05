@@ -29,14 +29,27 @@ impl From<VPayout> for Payout {
 #[serde(crate = "near_sdk::serde")]
 pub enum PayoutStatus {
    Pending,
-   Complete
+   Complete,
+}
+
+impl Giveaway {
+   pub fn internal_get_payouts(&self, event_id: &u64) -> Vec<Payout> {
+      self.payouts.get(&event_id).unwrap_or_else(|| [].to_vec())
+   }
 }
 
 #[near_bindgen]
 impl Giveaway {
-   pub fn get_payouts(&self, event_id: u64, from_index: u64, limit: u64) -> Vec<(PayoutIndex, Option<Payout>)> {
-      (from_index..std::cmp::min(from_index + limit, self.events.len())).map(|index| {
-         (index, self.payouts.get(&(event_id, index)))
-      }).collect()
+   pub fn get_payouts(&self, event_id: u64, from_index: Option<u64>, limit: Option<u64>) -> Vec<Payout> {
+      let payouts = self.internal_get_payouts(&event_id);
+      if from_index.is_none() && limit.is_none(){
+         return payouts;
+      }
+      let from_index = from_index.unwrap_or(0);
+      let limit = limit.unwrap_or(payouts.len() as u64);
+
+      (from_index..from_index + limit)
+         .map(|index| payouts.get(index as usize).unwrap().to_owned())
+         .collect()
    }
 }
