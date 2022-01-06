@@ -107,11 +107,11 @@ const Events = ({
           <div className="grid lg:grid-cols-4 md:grid-cols-2 xs:grid-cols-1 gap-4">
             <AddEventCard onAddEvent={() => setIsNewEventDialogOpen(true)} />
             {events &&
-              Object.keys(events).map((key, index) => {
+              events.map((event, index) => {
                 return (
                   <EventCard
                     key={index}
-                    currentEvent={{ ...events[key], id: parseInt(key) }}
+                    currentEvent={event}
                     index={index}
                     contract={contract}
                     currentUser={currentUser}

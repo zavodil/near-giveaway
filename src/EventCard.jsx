@@ -31,7 +31,7 @@ const EventCard = ({
   useEffect(() => {
     if (onLoading) {
       onLoading(true);
-      contract.get_event({ id: event.id }).then(
+      contract.get_event({ event_id: event.event_id }).then(
         (event) => {
           onLoading(false);
           setEvent(event);
@@ -41,7 +41,7 @@ const EventCard = ({
         }
       );
     }
-  }, [contract, event.id, onLoading]);
+  }, [contract, event.event_id, onLoading]);
 
   let [, , resetIsShowing] = useTimeoutFn(
     () => setIsShowing(true),

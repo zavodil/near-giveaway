@@ -72,7 +72,7 @@ const EventDetails = ({
       contract
         .insert_participants(
           {
-            event_id: event.id,
+            event_id: event.event_id,
             participants: newParticipants.map((p) => p.id),
           },
           BOATLOAD_OF_GAS
@@ -228,7 +228,7 @@ const EventDetails = ({
           Accepting participants: {formatDate(addParticipantsStartDate)} -{" "}
           {formatDate(addParticipantsEndDate)}
         </div>
-        <div className="text-sm font-medium text-black text flex flex-row items-center mt-2">
+        <div className="text-md font-medium text-black text flex flex-row items-center mt-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             className="h-6 w-6 mr-1"
@@ -245,7 +245,14 @@ const EventDetails = ({
           </svg>
           Rewards:
           {event.rewards &&
-            event.rewards.map((r, i) => <span key={i}>{r}</span>)}
+            event.rewards.map((r, i) => (
+              <div
+                className="pr-2 pl-2 ml-2 bg-gradient-to-r from-green-300 to-green-500 rounded-lg"
+                key={i}
+              >
+                {r}
+              </div>
+            ))}
         </div>
         <div className="text-xl font-medium text-black text-center">
           {event.participants.length > 0
