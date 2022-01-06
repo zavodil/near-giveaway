@@ -49,7 +49,7 @@ const EventDetails = ({
       contract
         .finalize_event(
           {
-            event_id: event.id,
+            event_id: event.event_id,
           },
           BOATLOAD_OF_GAS
         )
