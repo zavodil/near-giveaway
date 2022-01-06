@@ -44,6 +44,7 @@ impl From<VEvent> for Event {
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct EventOutput {
+   pub event_id: u64,
    pub owner_account_id: AccountId,
    pub status: EventStatus,
    pub rewards: Vec<WrappedBalance>,
@@ -60,10 +61,11 @@ pub struct EventOutput {
    pub description: String
 }
 
-impl From<VEvent> for EventOutput {
-   fn from(v_event: VEvent) -> Self {
+impl EventOutput {
+   pub fn from_event(v_event: VEvent, event_id: &u64) -> Self {
       match v_event {
          VEvent::Current(event) => EventOutput {
+            event_id: *event_id,
             owner_account_id: event.owner_account_id,
             status: event.status,
             rewards: event.rewards.to_vec(),
@@ -108,29 +110,29 @@ pub enum EventStatus {
 
 impl Giveaway {
    fn internal_get_event_output(&self, event_id: &u64) -> Option<EventOutput> {
-      self.events.get(event_id).map(|event| VEvent::Current(event).into())
+      self.events.get(event_id).map(|event| EventOutput::from_event(VEvent::Current(event), event_id))
    }
 
    pub fn internal_get_event(&self, event_id: &u64) -> Event {
-      self.events.get(&event_id).expect("ERR_NO_EVENT")
+      self.events.get(event_id).expect("ERR_NO_EVENT")
    }
 }
 
 #[near_bindgen]
 impl Giveaway {
-   pub fn get_events_to_finalize(&self, from_index: u64, limit: u64) -> Vec<(u64, Option<EventOutput>)> {
+   pub fn get_events_to_finalize(&self, from_index: u64, limit: u64) -> Vec<Option<EventOutput>> {
       let current_timestamp = env::block_timestamp();
       (from_index..std::cmp::min(from_index + limit, self.events.len())).filter(|index| {
          let event = self.events.get(&index.clone()).unwrap();
          event.status == EventStatus::Pending && current_timestamp >= event.event_timestamp.into()
       })
-         .map(|index| (index, self.internal_get_event_output(&index)))
+         .map(|index| self.internal_get_event_output(&index))
          .collect()
    }
 
-   pub fn get_events(&self, from_index: u64, limit: u64) -> Vec<(u64, Option<EventOutput>)> {
+   pub fn get_events(&self, from_index: u64, limit: u64) -> Vec<Option<EventOutput>> {
       (from_index..std::cmp::min(from_index + limit, self.events.len()))
-         .map(|index| (index, self.internal_get_event_output(&index)))
+         .map(|index| self.internal_get_event_output(&index))
          .collect()
    }
 

@@ -34,7 +34,7 @@ pub enum PayoutStatus {
 
 impl Giveaway {
    pub fn internal_get_payouts(&self, event_id: &u64) -> Vec<Payout> {
-      self.payouts.get(&event_id).unwrap_or_else(|| [].to_vec())
+      self.payouts.get(event_id).unwrap_or_else(|| [].to_vec())
    }
 }
 

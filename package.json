@@ -20,9 +20,9 @@
     "deploy:contract:testnet": "export NODE_ENV=testnet && near deploy",
     "build:web:all": "export NODE_ENV=mainnet && rm -r mainnet && parcel build src/index.html --public-url ./ && mv dist mainnet && export NODE_ENV=testnet && rm -r testnet && parcel build src/index.html --public-url ./ && mv dist testnet",
     "dev:clear": "rm -r neardev",
-    "test": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js --useStderr --verbose false",
-    "test:1": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js -t 'Create Event' --useStderr --verbose false",
-    "test:2": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1640966965154-54263632565336 && jest rest-api.test.js -t '10 participant, 1 reward, 10 times' --useStderr --silent false --verbose"
+    "test": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1641421731569-38860898594754 && jest rest-api.test.js --useStderr --verbose false",
+    "test:1": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1641421731569-38860898594754 && jest rest-api.test.js -t 'Create Event' --useStderr --verbose false",
+    "test:2": "export NODE_ENV=testnet && export CONTRACT_NAME=dev-1641421731569-38860898594754 && jest rest-api.test.js -t '10 participant, 1 reward, 10 times' --useStderr --silent false --verbose"
   },
   "devDependencies": {
     "@craco/craco": "^6.4.0",
