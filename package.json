@@ -2,6 +2,7 @@
   "name": "near-giveaway",
   "version": "0.1.0",
   "license": "UNLICENSED",
+  "homepage": "https://zavodil.github.io/near-giveaway/",
   "scripts": {
     "build": "npm run build:contract && npm run build:web",
     "build:contract": "node contract/compile.js",
