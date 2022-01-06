@@ -56,7 +56,6 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
       description &&
       description.length > 0 &&
       rewards.length > 0 &&
-      participants.length > 0 &&
       eventDate &&
       addParticipantsStartDate
     );
