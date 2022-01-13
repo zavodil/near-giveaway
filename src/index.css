@@ -25,3 +25,20 @@ body {
   border: 1px solid #ddd;
   background-color: #ddd;
 }
+
+.react-datetime-picker__calendar {
+  width: 260px;
+}
+
+.react-calendar {
+  width: 260px;
+  line-height: 0.8em;
+}
+
+.react-datetime-picker__calendar {
+  z-index: 1000000;
+}
+
+.ReactTags__remove {
+  padding-left: 3px;
+}

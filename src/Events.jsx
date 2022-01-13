@@ -5,7 +5,7 @@ import EventCard from "./EventCard";
 import EventDetails from "./EventDetails";
 import moment from "moment";
 import { BOATLOAD_OF_GAS } from "./utils";
-import Big from "big.js";
+import * as nearAPI from 'near-api-js'
 
 const Events = ({
   contract,
@@ -16,8 +16,6 @@ const Events = ({
   onError,
 }) => {
   const [events, setEvents] = useState();
-  const [fromIndex, setFromIndex] = useState(0);
-  const [limit, setLimit] = useState(10);
   const [shouldReloadEvents, setShouldReloadEvents] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState();
   const [isNewEventDialogOpen, setIsNewEventDialogOpen] = useState(false);
@@ -47,17 +45,20 @@ const Events = ({
     participants
   ) => {
     onLoading(true);
-    //TODO should we add comission to the total sum?
+
     const totalRewards = rewards
       .map((r) => r.id)
-      .reduce((a, b) => parseInt(a) + parseInt(b));
+      .reduce((a, b) => parseFloat(a) + parseFloat(b));
+
+    const serviceFee = Math.min(10, totalRewards * 0.01);
+
     contract
       .add_event(
         {
           event_input: {
             title,
             description,
-            rewards: rewards.map((r) => r.id),
+            rewards: rewards.map((r) => nearAPI.utils.format.parseNearAmount(r.id.toString())),
             participants: participants.map((p) => p.id),
             allow_duplicate_participants: allowDuplicates,
             event_timestamp: toNano(eventDate),
@@ -66,9 +67,7 @@ const Events = ({
           },
         },
         BOATLOAD_OF_GAS,
-        Big(totalRewards)
-          .times(10 ** 24)
-          .toFixed()
+        nearAPI.utils.format.parseNearAmount((serviceFee + totalRewards).toString())
       )
       .then(
         () => {
@@ -82,23 +81,35 @@ const Events = ({
       );
   };
 
-  useEffect(() => {
+  useEffect(async () => {
     if (onLoading && shouldReloadEvents) {
       onLoading(true);
-      contract.get_events({ from_index: fromIndex, limit: limit }).then(
-        (events) => {
-          onLoading(false);
-          setEvents(events);
-          setShouldReloadEvents(false);
-        },
-        (err) => {
-          setShouldReloadEvents(false);
-          onLoading(false);
-          onError(`${err && err.kind ? err.kind["ExecutionError"] : err}`);
+      let fromIndex = 0;
+      const limit = 30;
+      let newEvents = [];
+      while (true) {
+        try {
+          let events = await contract.get_events({from_index: fromIndex, limit: limit});
+          newEvents = newEvents.concat(events);
+          if (events.length !== limit)
+            break;
+
+          fromIndex += limit;
         }
-      );
+        catch (err){
+          onError(`${err}`);
+          break;
+        }
+      }
+      newEvents = newEvents.sort((a,b) => parseInt(b.event_timestamp) - parseInt(a.event_timestamp));
+
+      if(newEvents.length){
+        setEvents(newEvents);
+      }
+      setShouldReloadEvents(false);
+      onLoading(false);
     }
-  }, [contract, onLoading, limit, fromIndex, onError, shouldReloadEvents]);
+  }, [contract, onLoading,  onError, shouldReloadEvents]);
 
   return (
     <>
@@ -112,6 +123,7 @@ const Events = ({
                   <EventCard
                     key={index}
                     currentEvent={event}
+                    delay={20}
                     index={index}
                     contract={contract}
                     currentUser={currentUser}

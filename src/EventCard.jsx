@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Transition } from "@headlessui/react";
 import { useTimeoutFn } from "react-use";
 import { toDate, formatDate } from "./utils";
+import * as nearAPI from 'near-api-js'
 
 const EventCard = ({
   currentEvent,
@@ -158,7 +159,7 @@ const EventCard = ({
               <div
                 className="pr-2 pl-2 ml-2 bg-gradient-to-r from-green-300 to-green-500 rounded-lg"
                 key={i}
-              >{`${r}`}</div>
+              >{`${nearAPI.utils.format.formatNearAmount(r, 2)}`}</div>
             ))}
         </div>
         <div className="text-md font-medium text-black text flex flex-row justify-start">

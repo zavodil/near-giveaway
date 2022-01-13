@@ -1,11 +1,12 @@
 import { Fragment, useState, useEffect } from "react";
 import { Transition } from "@headlessui/react";
 import { useTimeoutFn } from "react-use";
-import { toDate, formatDate } from "./utils";
+import { toDate, formatDate, accountExist } from "./utils";
 import { WithContext as ReactTags } from "react-tag-input";
 import { delimiters } from "./utils";
 import { BOATLOAD_OF_GAS } from "./utils";
 import moment from "moment";
+import * as nearAPI from 'near-api-js'
 
 const EventDetails = ({
   currentEvent,
@@ -22,11 +23,15 @@ const EventDetails = ({
   const [event, setEvent] = useState(currentEvent);
   const [shouldReloadEvent, setShouldReloadEvent] = useState(false);
   const [newParticipants, setNewParticipants] = useState([]);
+  const [isFinalizeEventDisabled, setIsFinalizeEventDisabled] = useState(false);
 
   let [, , resetIsShowing] = useTimeoutFn(() => setIsShowing(true), 100);
   useEffect(() => {
     resetIsShowing();
-  }, [resetIsShowing]);
+    if(event && event.event_timestamp) {
+      setIsFinalizeEventDisabled(toDate(event.event_timestamp).isAfter(moment()));
+    }
+  }, [resetIsShowing, setIsFinalizeEventDisabled]);
 
   const isOwner =
     event.owner_account_id &&
@@ -95,8 +100,14 @@ const EventDetails = ({
   };
 
   const handleAddParticipant = (p) => {
-    //TODO Add address validation
-    setNewParticipants([...newParticipants, p]);
+    accountExist(p.text).then(result=>{
+      if(result) {
+        setNewParticipants([...newParticipants, p]);
+      }
+      else{
+        alert("Illegal account " + p.text)
+      }
+    });
   };
 
   const handleDragParticipant = (tag, currPos, newPos) => {
@@ -135,7 +146,7 @@ const EventDetails = ({
     <Transition
       as={Fragment}
       show={isShowing}
-      enter={`transform transition duration-[250ms]`}
+      enter={`transform transition duration-[20ms]`}
       enterFrom="opacity-0 rotate-[-120deg] scale-50"
       enterTo="opacity-100 rotate-0 scale-100"
       leave="transform duration-200 transition ease-in-out"
@@ -188,6 +199,7 @@ const EventDetails = ({
           {!finalizedDate && finalizedDate !== "0" && (
             <button
               className="disabled:opacity-50 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded flex-none"
+              disabled={isFinalizeEventDisabled}
               onClick={finalizeEvent}
             >
               Finalize Event
@@ -245,14 +257,14 @@ const EventDetails = ({
               d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          Rewards:
+          Rewards (NEAR):
           {event.rewards &&
             event.rewards.map((r, i) => (
               <div
                 className="pr-2 pl-2 ml-2 bg-gradient-to-r from-green-300 to-green-500 rounded-lg"
                 key={i}
               >
-                {r}
+                {nearAPI.utils.format.formatNearAmount(r, 2)}
               </div>
             ))}
         </div>

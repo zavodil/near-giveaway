@@ -1,10 +1,10 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { Switch } from "@headlessui/react";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import TextField from "./TextField";
 import moment from "moment";
 import { WithContext as ReactTags } from "react-tag-input";
-import { delimiters } from "./utils";
+import { delimiters, accountExist} from "./utils";
 
 const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
   const [title, setTitle] = useState("");
@@ -14,23 +14,21 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
     { id: "lkskrnk.testnet", text: "lkskrnk.testnet" },
   ]);
   const [allowDuplicates, setAllowDuplicates] = useState(false);
-  const [eventDate, setEventDate] = useState(
-    moment().add(8, "days").endOf("day").toDate()
-  );
-  const [addParticipantsStartDate, setAddParticipantsStartDate] = useState(
-    moment().add(1, "day").startOf("day").toDate()
-  );
-  const [addParticipantsEndDate, setAddParticipantsEndDate] = useState(
-    moment().add(7, "days").endOf("day").toDate()
-  );
+  const [eventDate, setEventDate] = useState(new Date());
+  const [addParticipantsStartDate, setAddParticipantsStartDate] = useState(new Date());
+  const [addParticipantsEndDate, setAddParticipantsEndDate] = useState(new Date());
 
   const handleDeleteReward = (i) => {
     setRewards(rewards.filter((r, index) => index !== i));
   };
 
   const handleAddReward = (r) => {
-    //TODO Add reward validation
-    setRewards([...rewards, r]);
+    if(parseFloat(r.id) > 0) {
+      setRewards([...rewards, r]);
+    }
+    else {
+      alert("Illegal reward " + r.id)
+    }
   };
 
   const handleDeleteParticipant = (i) => {
@@ -38,8 +36,14 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
   };
 
   const handleAddParticipant = (p) => {
-    //TODO Add address validation
-    setParticipants([...participants, p]);
+    accountExist(p.id).then(result=>{
+      if(result) {
+        setParticipants([...participants, p]);
+      }
+      else{
+        alert("Illegal account " + p.id)
+      }
+    });
   };
 
   const handleDragParticipant = (tag, currPos, newPos) => {
@@ -60,6 +64,14 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
       addParticipantsStartDate
     );
   };
+
+  useEffect(() => {
+    if(isOpen) {
+      setEventDate(moment().add(8, "days").startOf("day").toDate())
+      setAddParticipantsStartDate(moment().add(1, "day").startOf("day").toDate())
+      setAddParticipantsEndDate(moment().add(7, "days").endOf("day").toDate())
+    }
+  }, [isOpen]);
 
   return (
     <>
@@ -98,7 +110,7 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <div className="inline-block w-full max-w-md p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
+              <div className="inline-block w-full max-w-md p-6 my-4 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-2xl">
                 <Dialog.Title
                   as="h3"
                   className="text-lg font-medium leading-6 text-gray-900"
@@ -168,7 +180,7 @@ const AddEventDialog = ({ isOpen, onClose, onRegister }) => {
 
                 <div className={`mt-4`}>
                   <label className="mb-2" htmlFor="rewards">
-                    Rewards:
+                    Rewards (NEAR):
                   </label>
                   <ReactTags
                     tags={rewards}

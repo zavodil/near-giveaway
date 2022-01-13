@@ -7,6 +7,7 @@ use near_sdk::serde::{Deserialize, Serialize};
 use crate::event::*;
 use crate::multisender::*;
 use crate::payout::*;
+use crate::utils::get_service_fee;
 
 mod event;
 mod payout;
@@ -19,14 +20,16 @@ type WrappedDuration = U64;
 type Duration = u64;
 
 const MAX_GIVEAWAY_WINNERS: usize = 128;
-const MIN_DEPOSIT_AMOUNT: u128 = 10_000_000_000_000_000_000_000;
+const MIN_DEPOSIT_AMOUNT: Balance = 10_000_000_000_000_000_000_000;
 const MAX_DESCRIPTION_LENGTH: usize = 280;
 const MAX_TITLE_LENGTH: usize = 128;
 
 const NO_DEPOSIT: Balance = 0;
-const SERVICE_COMMISSION: Balance = 10_000_000_000_000_000_000;
 const BASE_PAYOUT_PREPARATION_GAS: Gas = Gas(25_000_000_000_000);
 const GAS_FOR_AFTER_MULTISEND: Gas = Gas(25_000_000_000_000);
+const SERVICE_FEE_NUMERATOR: u64 = 100;
+const SERVICE_FEE_DENOMINATOR: u64 = 10000;
+const MAX_SERVICE_FEE: Balance = 10_000_000_000_000_000_000_000_000;
 
 #[ext_contract(ext_self)]
 pub trait ExtContract {
@@ -113,13 +116,14 @@ impl Giveaway {
             total += amount.0;
         }
 
-        let payment: Balance = total + SERVICE_COMMISSION;
-        self.internal_add_service_fee(&event_input.rewards_token_id, &SERVICE_COMMISSION);
+        let service_fee = get_service_fee(&total);
+        let payment: Balance = total + service_fee;
+        self.internal_add_service_fee(&event_input.rewards_token_id, &service_fee);
 
         assert!(
             payment <= tokens,
             "Not enough attached tokens to provide rewards (Attached: {}. Total rewards: {}, Service commission: {})",
-            tokens, total, SERVICE_COMMISSION
+            tokens, total, service_fee
         );
 
         if payment < tokens {

@@ -25,6 +25,10 @@ impl Giveaway {
    }
 }
 
+pub fn get_service_fee(total: &Balance) -> Balance{
+   std::cmp::min(MAX_SERVICE_FEE, total * SERVICE_FEE_NUMERATOR as Balance / SERVICE_FEE_DENOMINATOR as Balance)
+}
+
 #[near_bindgen]
 impl Giveaway {
    pub fn set_active(&mut self, active: bool) {
@@ -38,4 +42,9 @@ impl Giveaway {
    pub fn get_total_service_fee(&self, token_id: Option<TokenId>) -> Option<Balance> {
       self.total_service_fee.get(&token_id)
    }
+
+   pub fn get_service_fee_percent(&self) -> f64{
+      SERVICE_FEE_NUMERATOR as f64 / SERVICE_FEE_DENOMINATOR as f64
+   }
+
 }
