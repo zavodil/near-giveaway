@@ -2,19 +2,10 @@ import { Fragment, useEffect, useState } from "react";
 import { Transition } from "@headlessui/react";
 import { useTimeoutFn } from "react-use";
 import { toDate, formatDate } from "./utils";
-import * as nearAPI from 'near-api-js'
+import * as nearAPI from "near-api-js";
+import { Link } from "react-router-dom";
 
-const EventCard = ({
-  currentEvent,
-  index,
-  delay,
-  contract,
-  currentUser,
-  nearConfig,
-  wallet,
-  onLoading,
-  onEventSelected,
-}) => {
+const EventCard = ({ currentEvent, index, delay, contract, onLoading }) => {
   let [isShowing, setIsShowing] = useState(false);
   let [isHovered, setIsHovered] = useState(false);
   const [event, setEvent] = useState(currentEvent);
@@ -64,8 +55,8 @@ const EventCard = ({
       leaveFrom="opacity-100 rotate-0 scale-100 "
       leaveTo="opacity-0 scale-95 "
     >
-      <div
-        onClick={() => onEventSelected(event)}
+      <Link
+        to={`events/${event.event_id}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         className={`w-full bg-gradient-to-r ${
@@ -185,7 +176,7 @@ const EventCard = ({
             event.participants.length > 0 &&
             `${event.participants.length} total participants.`}
         </div>
-      </div>
+      </Link>
     </Transition>
   );
 };

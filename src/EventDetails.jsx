@@ -5,48 +5,41 @@ import { toDate, formatDate, accountExist } from "./utils";
 import { WithContext as ReactTags } from "react-tag-input";
 import { delimiters } from "./utils";
 import { BOATLOAD_OF_GAS } from "./utils";
+import LoadingIndicator from "./LoadingIndicator";
 import moment from "moment";
-import * as nearAPI from 'near-api-js'
+import * as nearAPI from "near-api-js";
+import { Link, useParams } from "react-router-dom";
 
 const EventDetails = ({
-  currentEvent,
   contract,
   currentUser,
-  nearConfig,
-  wallet,
   onClose,
   onLoading,
   onError,
 }) => {
   const [isShowing, setIsShowing] = useState(false);
   const [closeButtonColor, setCloseButtonColor] = useState("#000");
-  const [event, setEvent] = useState(currentEvent);
-  const [shouldReloadEvent, setShouldReloadEvent] = useState(false);
+  const [event, setEvent] = useState();
+  const [isOwner, setIsOwner] = useState();
+  const [eventDate, setEventDate] = useState();
+  const [finalizedDate, setFinalizedDate] = useState();
+  const [addParticipantsStartDate, setAddParticipantsStartDate] = useState();
+  const [addParticipantsEndDate, setAddParticipantsEndDate] = useState();
+  const [shouldReloadEvent, setShouldReloadEvent] = useState(true);
   const [newParticipants, setNewParticipants] = useState([]);
   const [isFinalizeEventDisabled, setIsFinalizeEventDisabled] = useState(false);
+
+  let params = useParams();
 
   let [, , resetIsShowing] = useTimeoutFn(() => setIsShowing(true), 100);
   useEffect(() => {
     resetIsShowing();
-    if(event && event.event_timestamp) {
-      setIsFinalizeEventDisabled(toDate(event.event_timestamp).isAfter(moment()));
+    if (event && event.event_timestamp) {
+      setIsFinalizeEventDisabled(
+        toDate(event.event_timestamp).isAfter(moment())
+      );
     }
-  }, [resetIsShowing, setIsFinalizeEventDisabled]);
-
-  const isOwner =
-    event.owner_account_id &&
-    currentUser &&
-    event.owner_account_id === currentUser.accountId;
-
-  const eventDate = toDate(event.event_timestamp);
-  const finalizedDate =
-    event.finalized_timestamp && event.finalized_timestamp !== "0"
-      ? toDate(event.finalized_timestamp)
-      : undefined;
-  const addParticipantsStartDate = toDate(
-    event.add_participants_start_timestamp
-  );
-  const addParticipantsEndDate = toDate(event.add_participants_end_timestamp);
+  }, [resetIsShowing, setIsFinalizeEventDisabled, event]);
 
   const finalizeEvent = () => {
     if (!finalizedDate && eventDate.isBefore(moment())) {
@@ -100,12 +93,11 @@ const EventDetails = ({
   };
 
   const handleAddParticipant = (p) => {
-    accountExist(p.text).then(result=>{
-      if(result) {
+    accountExist(p.text).then((result) => {
+      if (result) {
         setNewParticipants([...newParticipants, p]);
-      }
-      else{
-        alert("Illegal account " + p.text)
+      } else {
+        alert("Illegal account " + p.text);
       }
     });
   };
@@ -118,18 +110,33 @@ const EventDetails = ({
   };
 
   useEffect(() => {
-    if (shouldReloadEvent && onLoading && onError) {
-      const eventId = event.id;
+    const eventId = parseInt(params.eventId);
+    if (eventId && shouldReloadEvent && onLoading && onError) {
       contract
-        .get_event(
-          {
-            event_id: eventId,
-          },
-          BOATLOAD_OF_GAS
-        )
+        .get_event({
+          event_id: eventId,
+        })
         .then(
           (event) => {
-            setEvent({ ...event, id: eventId });
+            setEvent(event);
+            setIsOwner(
+              event.owner_account_id &&
+                currentUser &&
+                event.owner_account_id === currentUser.accountId
+            );
+
+            setEventDate(toDate(event.event_timestamp));
+            setFinalizedDate(
+              event.finalized_timestamp && event.finalized_timestamp !== "0"
+                ? toDate(event.finalized_timestamp)
+                : undefined
+            );
+            setAddParticipantsStartDate(
+              toDate(event.add_participants_start_timestamp)
+            );
+            setAddParticipantsEndDate(
+              toDate(event.add_participants_end_timestamp)
+            );
             setShouldReloadEvent(false);
             onLoading(false);
           },
@@ -140,7 +147,18 @@ const EventDetails = ({
           }
         );
     }
-  }, [contract, event.id, shouldReloadEvent, onLoading, onError]);
+  }, [
+    contract,
+    params.eventId,
+    currentUser,
+    shouldReloadEvent,
+    onLoading,
+    onError,
+  ]);
+
+  if (!event) {
+    return <LoadingIndicator isLoading={true} />;
+  }
 
   return (
     <Transition
@@ -158,7 +176,8 @@ const EventDetails = ({
           <div className="mt-2 text-2xl text-center font-medium text-black">
             {event.title}
           </div>
-          <button
+          <Link
+            to="/"
             className="font-medium "
             onClick={onClose}
             onMouseEnter={() => setCloseButtonColor("#ddd")}
@@ -178,7 +197,7 @@ const EventDetails = ({
                 d="M6 18L18 6M6 6l12 12"
               />
             </svg>
-          </button>
+          </Link>
         </div>
         <div className="text-xl font-medium text-black flex flex-row items-center justify-between">
           <svg
@@ -221,7 +240,9 @@ const EventDetails = ({
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <p className="flex-grow">Draw date: {formatDate(eventDate)}</p>
+          {eventDate && (
+            <p className="flex-grow">Draw date: {formatDate(eventDate)}</p>
+          )}
           {finalizedDate && <p>Finalized date: {formatDate(finalizedDate)}</p>}
         </div>
         <div className="text-md font-medium text-black text flex flex-row items-center mt-2">

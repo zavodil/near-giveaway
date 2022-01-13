@@ -2,10 +2,9 @@ import React, { useState, useEffect } from "react";
 import AddEventCard from "./AddEventCard";
 import AddEventDialog from "./AddEventDialog";
 import EventCard from "./EventCard";
-import EventDetails from "./EventDetails";
 import moment from "moment";
 import { BOATLOAD_OF_GAS } from "./utils";
-import * as nearAPI from 'near-api-js'
+import * as nearAPI from "near-api-js";
 
 const Events = ({
   contract,
@@ -17,19 +16,7 @@ const Events = ({
 }) => {
   const [events, setEvents] = useState();
   const [shouldReloadEvents, setShouldReloadEvents] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState();
   const [isNewEventDialogOpen, setIsNewEventDialogOpen] = useState(false);
-
-  const activateEvent = (election) => {
-    localStorage.setItem("activeEvent", election.id);
-    setSelectedEvent(election);
-  };
-
-  const deactivateEvent = () => {
-    localStorage.removeItem("activeEvent");
-    setSelectedEvent(null);
-  };
-
   const toNano = (date) => {
     return `${moment(date).format("x")}000000`;
   };
@@ -58,7 +45,9 @@ const Events = ({
           event_input: {
             title,
             description,
-            rewards: rewards.map((r) => nearAPI.utils.format.parseNearAmount(r.id.toString())),
+            rewards: rewards.map((r) =>
+              nearAPI.utils.format.parseNearAmount(r.id.toString())
+            ),
             participants: participants.map((p) => p.id),
             allow_duplicate_participants: allowDuplicates,
             event_timestamp: toNano(eventDate),
@@ -67,7 +56,9 @@ const Events = ({
           },
         },
         BOATLOAD_OF_GAS,
-        nearAPI.utils.format.parseNearAmount((serviceFee + totalRewards).toString())
+        nearAPI.utils.format.parseNearAmount(
+          (serviceFee + totalRewards).toString()
+        )
       )
       .then(
         () => {
@@ -81,81 +72,68 @@ const Events = ({
       );
   };
 
-  useEffect(async () => {
-    if (onLoading && shouldReloadEvents) {
-      onLoading(true);
-      let fromIndex = 0;
-      const limit = 30;
-      let newEvents = [];
-      while (true) {
-        try {
-          let events = await contract.get_events({from_index: fromIndex, limit: limit});
-          newEvents = newEvents.concat(events);
-          if (events.length !== limit)
+  useEffect(() => {
+    async function reloadEvents() {
+      if (onLoading && shouldReloadEvents) {
+        onLoading(true);
+        let fromIndex = 0;
+        const limit = 30;
+        let newEvents = [];
+        while (true) {
+          try {
+            let events = await contract.get_events({
+              from_index: fromIndex,
+              limit: limit,
+            });
+            newEvents = newEvents.concat(events);
+            if (events.length !== limit) break;
+
+            fromIndex += limit;
+          } catch (err) {
+            onError(`${err}`);
             break;
-
-          fromIndex += limit;
+          }
         }
-        catch (err){
-          onError(`${err}`);
-          break;
-        }
-      }
-      newEvents = newEvents.sort((a,b) => parseInt(b.event_timestamp) - parseInt(a.event_timestamp));
+        newEvents = newEvents.sort(
+          (a, b) => parseInt(b.event_timestamp) - parseInt(a.event_timestamp)
+        );
 
-      if(newEvents.length){
-        setEvents(newEvents);
+        if (newEvents.length) {
+          setEvents(newEvents);
+        }
+        setShouldReloadEvents(false);
+        onLoading(false);
       }
-      setShouldReloadEvents(false);
-      onLoading(false);
     }
-  }, [contract, onLoading,  onError, shouldReloadEvents]);
+    reloadEvents();
+  }, [contract, onLoading, onError, shouldReloadEvents]);
 
   return (
     <>
       <div className="container mx-auto flex-row">
-        {!selectedEvent && (
-          <div className="grid lg:grid-cols-4 md:grid-cols-2 xs:grid-cols-1 gap-4">
-            <AddEventCard onAddEvent={() => setIsNewEventDialogOpen(true)} />
-            {events &&
-              events.map((event, index) => {
-                return (
-                  <EventCard
-                    key={index}
-                    currentEvent={event}
-                    delay={20}
-                    index={index}
-                    contract={contract}
-                    currentUser={currentUser}
-                    nearConfig={nearConfig}
-                    wallet={wallet}
-                    onLoading={onLoading}
-                    onEventSelected={activateEvent}
-                  />
-                );
-              })}
-          </div>
-        )}
+        <div className="grid lg:grid-cols-4 md:grid-cols-2 xs:grid-cols-1 gap-4">
+          <AddEventCard onAddEvent={() => setIsNewEventDialogOpen(true)} />
+          {events &&
+            events.map((event, index) => {
+              return (
+                <EventCard
+                  key={index}
+                  currentEvent={event}
+                  delay={20}
+                  index={index}
+                  contract={contract}
+                  onLoading={onLoading}
+                />
+              );
+            })}
+        </div>
+        {/* )} */}
         {isNewEventDialogOpen && (
           <AddEventDialog
             isOpen={isNewEventDialogOpen}
             onClose={() => setIsNewEventDialogOpen(false)}
             onRegister={registerEvent}
           />
-        )}
-        {selectedEvent && (
-          <div className="grid grid-cols-1">
-            <EventDetails
-              currentEvent={selectedEvent}
-              contract={contract}
-              currentUser={currentUser}
-              nearConfig={nearConfig}
-              wallet={wallet}
-              onLoading={onLoading}
-              onError={onError}
-              onClose={deactivateEvent}
-            />
-          </div>
         )}
       </div>
     </>
