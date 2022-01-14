@@ -26,7 +26,7 @@ const Events = ({
     return `${moment(date).format("x")}000000`;
   };
 
-  const limits = [1, 5, 10, 20, 30, 50, 100];
+  const limits = [5, 10, 20, 30];
 
   const registerEvent = (
     title,
