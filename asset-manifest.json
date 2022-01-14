@@ -1,23 +1,23 @@
 {
   "files": {
-    "main.css": "/near-giveaway/static/css/main.bac03c3d.chunk.css",
-    "main.js": "/near-giveaway/static/js/main.7953e523.chunk.js",
-    "main.js.map": "/near-giveaway/static/js/main.7953e523.chunk.js.map",
+    "main.css": "/near-giveaway/static/css/main.e29d9e54.chunk.css",
+    "main.js": "/near-giveaway/static/js/main.54b9b9d2.chunk.js",
+    "main.js.map": "/near-giveaway/static/js/main.54b9b9d2.chunk.js.map",
     "runtime-main.js": "/near-giveaway/static/js/runtime-main.13e7fe51.js",
     "runtime-main.js.map": "/near-giveaway/static/js/runtime-main.13e7fe51.js.map",
     "static/css/2.4f9b77db.chunk.css": "/near-giveaway/static/css/2.4f9b77db.chunk.css",
-    "static/js/2.829acf66.chunk.js": "/near-giveaway/static/js/2.829acf66.chunk.js",
-    "static/js/2.829acf66.chunk.js.map": "/near-giveaway/static/js/2.829acf66.chunk.js.map",
+    "static/js/2.63926fa5.chunk.js": "/near-giveaway/static/js/2.63926fa5.chunk.js",
+    "static/js/2.63926fa5.chunk.js.map": "/near-giveaway/static/js/2.63926fa5.chunk.js.map",
     "index.html": "/near-giveaway/index.html",
     "static/css/2.4f9b77db.chunk.css.map": "/near-giveaway/static/css/2.4f9b77db.chunk.css.map",
-    "static/css/main.bac03c3d.chunk.css.map": "/near-giveaway/static/css/main.bac03c3d.chunk.css.map",
-    "static/js/2.829acf66.chunk.js.LICENSE.txt": "/near-giveaway/static/js/2.829acf66.chunk.js.LICENSE.txt"
+    "static/css/main.e29d9e54.chunk.css.map": "/near-giveaway/static/css/main.e29d9e54.chunk.css.map",
+    "static/js/2.63926fa5.chunk.js.LICENSE.txt": "/near-giveaway/static/js/2.63926fa5.chunk.js.LICENSE.txt"
   },
   "entrypoints": [
     "static/js/runtime-main.13e7fe51.js",
     "static/css/2.4f9b77db.chunk.css",
-    "static/js/2.829acf66.chunk.js",
-    "static/css/main.bac03c3d.chunk.css",
-    "static/js/main.7953e523.chunk.js"
+    "static/js/2.63926fa5.chunk.js",
+    "static/css/main.e29d9e54.chunk.css",
+    "static/js/main.54b9b9d2.chunk.js"
   ]
 }
