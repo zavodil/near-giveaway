@@ -5,6 +5,8 @@ import Authorization from "./Authorization";
 import LoadingIndicator from "./LoadingIndicator";
 import ErrorPopup from "./ErrorPopup";
 import Events from "./Events";
+import { Routes, Route } from "react-router-dom";
+import EventDetails from "./EventDetails";
 
 const App = ({ contract, currentUser, nearConfig, wallet }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -22,14 +24,34 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
       <ErrorPopup error={error} callback={() => setError("")} />
       <LoadingIndicator isLoading={isLoading} />
       {currentUser && currentUser.accountId && (
-        <Events
-          contract={contract}
-          currentUser={currentUser}
-          nearConfig={nearConfig}
-          wallet={wallet}
-          onLoading={setIsLoading}
-          onError={setError}
-        />
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Events
+                contract={contract}
+                currentUser={currentUser}
+                nearConfig={nearConfig}
+                wallet={wallet}
+                onLoading={setIsLoading}
+                onError={setError}
+              />
+            }
+          />
+          <Route
+            path="events/:eventId"
+            element={
+              <EventDetails
+                contract={contract}
+                currentUser={currentUser}
+                nearConfig={nearConfig}
+                wallet={wallet}
+                onLoading={setIsLoading}
+                onError={setError}
+              />
+            }
+          />
+        </Routes>
       )}
     </div>
   );

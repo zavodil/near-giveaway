@@ -1,10 +1,10 @@
 import moment from "moment";
 import Big from "big.js";
-import * as nearAPI from 'near-api-js'
-import getConfig from './config';
+import * as nearAPI from "near-api-js";
+import getConfig from "./config";
 
 export const formatDate = (date) => {
-  return date.format("DD MMM yyyy HH:mm");
+  return date ? date.format("DD MMM yyyy HH:mm") : "";
 };
 
 export const toDate = (date) => {
@@ -25,8 +25,11 @@ const KeyCodes = {
 export const accountExist = async (accountId) => {
   const connection = getNearAccountConnection();
   if (accountId.length === 44) {
-    let key = new nearAPI.utils.PublicKey({keyType: nearAPI.utils.key_pair.KeyType.ED25519, data: Buffer.from(accountId, 'hex')});
-    return !!(key.toString())
+    let key = new nearAPI.utils.PublicKey({
+      keyType: nearAPI.utils.key_pair.KeyType.ED25519,
+      data: Buffer.from(accountId, "hex"),
+    });
+    return !!key.toString();
   }
 
   try {
@@ -35,12 +38,12 @@ export const accountExist = async (accountId) => {
   } catch (error) {
     return false;
   }
-}
+};
 
 function getNearAccountConnection() {
   if (!window.connection) {
     const config = getConfig(process.env.NODE_ENV || "testnet");
-    console.log(config)
+    console.log(config);
     const provider = new nearAPI.providers.JsonRpcProvider(config.nodeUrl);
     window.connection = new nearAPI.Connection(config.nodeUrl, provider, {});
   }
