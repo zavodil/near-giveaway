@@ -2,7 +2,6 @@ import "regenerator-runtime/runtime";
 import React, { useState } from "react";
 import PropTypes from "prop-types";
 import Authorization from "./Authorization";
-import LoadingIndicator from "./LoadingIndicator";
 import ErrorPopup from "./ErrorPopup";
 import Events from "./Events";
 import { Routes, Route } from "react-router-dom";
@@ -19,10 +18,9 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
         currentUser={currentUser}
         nearConfig={nearConfig}
         wallet={wallet}
-        onLoading={setIsLoading}
+        isLoading={isLoading}
       />
       <ErrorPopup error={error} callback={() => setError("")} />
-      <LoadingIndicator isLoading={isLoading} />
       {currentUser && currentUser.accountId && (
         <Routes>
           <Route

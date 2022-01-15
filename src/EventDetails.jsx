@@ -5,7 +5,6 @@ import { toDate, formatDate, accountExist } from "./utils";
 import { WithContext as ReactTags } from "react-tag-input";
 import { delimiters } from "./utils";
 import { BOATLOAD_OF_GAS } from "./utils";
-import LoadingIndicator from "./LoadingIndicator";
 import moment from "moment";
 import * as nearAPI from "near-api-js";
 import { Link, useParams } from "react-router-dom";
@@ -112,6 +111,7 @@ const EventDetails = ({
   useEffect(() => {
     const eventId = parseInt(params.eventId);
     if (eventId && shouldReloadEvent && onLoading && onError) {
+      onLoading(true);
       contract
         .get_event({
           event_id: eventId,
@@ -157,7 +157,7 @@ const EventDetails = ({
   ]);
 
   if (!event) {
-    return <LoadingIndicator isLoading={true} />;
+    return <></>;
   }
 
   return (
@@ -171,7 +171,7 @@ const EventDetails = ({
       leaveFrom="opacity-100 rotate-0 scale-100 "
       leaveTo="opacity-0 scale-95 "
     >
-      <div className="mw-800 bg-gradient-to-r from-indigo-300 to-indigo-500 p-6 rounded-xl flex-col shadow-md flex">
+      <div className="mw-800 mt-4 bg-gradient-to-r from-indigo-300 to-indigo-500 p-6 rounded-xl flex-col shadow-md flex">
         <div className="text-2xl flex justify-between font-medium items-center mb-4">
           <div className="mt-2 text-2xl text-center font-medium text-black">
             {event.title}
